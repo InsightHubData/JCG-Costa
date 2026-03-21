@@ -49,10 +49,10 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
 }
 .ln-left::after{content:'';position:absolute;right:0;top:0;bottom:0;width:1px;
   background:linear-gradient(180deg,transparent,rgba(255,255,255,.12) 30%,rgba(255,255,255,.12) 70%,transparent)}
-.ln-logo-panel{background:#fff;border-radius:14px;padding:14px 28px;margin-bottom:22px;
+.ln-logo-panel{background:#fff;border-radius:14px;padding:18px 28px;margin-bottom:22px;
   display:flex;align-items:center;justify-content:center;width:100%;
   box-shadow:0 4px 20px rgba(0,0,0,.2)}
-.ln-logo{height:56px;object-fit:contain}
+.ln-logo{height:90px;object-fit:contain}
 .ln-sys-title{font-family:'Oswald',sans-serif;font-size:10px;font-weight:600;letter-spacing:4px;
   text-transform:uppercase;color:rgba(255,255,255,.9);margin-bottom:6px;text-align:center}
 .ln-sys-sub{font-size:12.5px;color:rgba(255,255,255,.5);text-align:center;max-width:260px;line-height:1.6}
@@ -303,18 +303,18 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
   import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const firebaseConfig = {
-    apiKey: "AIzaSyDQrjjXPR2V0WkNqLViSFDe1tZIFu6JZGA",
-    authDomain: "db-supply-norte.firebaseapp.com",
-    projectId: "db-supply-norte",
-    storageBucket: "db-supply-norte.firebasestorage.app",
-    messagingSenderId: "1065231568839",
-    appId: "1:1065231568839:web:decff755ef5408316d13e2"
+    apiKey: "AIzaSyD4Tu-hcRwaMa334xvEk-CpftXk7S-rS3Y",
+    authDomain: "db-jcg-costa.firebaseapp.com",
+    projectId: "db-jcg-costa",
+    storageBucket: "db-jcg-costa.firebasestorage.app",
+    messagingSenderId: "54037507196",
+    appId: "1:54037507196:web:ce348fb82431c7fce72df9"
   };
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
   const auth = getAuth(app);
-  const FB_EMAIL = 'app.supplynorte@gmail.com';
-  const FB_PASS  = 'SupplyNorte@2025!';
+  const FB_EMAIL = 'app.jcgcosta@gmail.com';
+  const FB_PASS  = 'JCGCosta@2025!';
 
   async function fbSignIn(){ try{ await signInWithEmailAndPassword(auth,FB_EMAIL,FB_PASS); }catch(e){ console.warn('FB auth:',e.message); } }
 

@@ -384,7 +384,7 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
     <div class="ln-right">
       <div class="lc-title">Bem-vindo de volta</div>
       <div class="lc-desc">Entre com suas credenciais para acessar o sistema.</div>
-      <div class="err-box" id="errBox">⚠️ Usuário ou senha inválidos.</div>
+      <div class="err-box" id="errBox" style="display:none">⚠️ Usuário ou senha inválidos.</div>
       <form id="loginForm" onsubmit="doLogin(event)">
         <div class="field-g">
           <label>Usuário</label>
@@ -976,19 +976,21 @@ function saveLSProd(){
    LOGIN
 ═══════════════════════════════════════ */
 function doLogin(e){
-  e.preventDefault();
-  var u = document.getElementById('uIn').value.trim().toLowerCase();
-  var p = document.getElementById('pIn').value.trim();
+  if(e) e.preventDefault();
+  var u = (document.getElementById('uIn').value||'').trim().toLowerCase();
+  var p = (document.getElementById('pIn').value||'').trim();
   var user = USERS[u];
   if(user && user.senha===p){
     currentUser=u;
     document.getElementById('loginWrap').style.display='none';
     var app=document.getElementById('appShell');
-    app.style.display='flex'; app.classList.add('active');
+    app.style.display='flex';
+    app.classList.add('active');
     document.getElementById('hdUser').textContent='👤 '+user.nome;
     initApp();
   } else {
-    var eb=document.getElementById('errBox'); eb.style.display='flex';
+    var eb=document.getElementById('errBox');
+    eb.style.display='flex';
     setTimeout(function(){ eb.style.display='none'; },3500);
     document.getElementById('pIn').value='';
   }

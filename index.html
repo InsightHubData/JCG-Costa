@@ -1056,7 +1056,7 @@ function acSearch(fieldId){
       document.getElementById('fCnpjOrgao').value=item.cnpj||'';
       document.getElementById('fCidadeOrgao').value=item.endereco||item.cidade||'';
       document.getElementById('fRespOrgao').value=item.resp||'';
-      var fl=document.getElementById('fLocal'); if(fl) fl.value=item.cidade||'';
+      var fl=document.getElementById('fLocal'); if(fl) fl.value=item.cidade||item.endereco||'';
       list.style.display='none';
     };
     list.appendChild(d);
@@ -1220,14 +1220,14 @@ function clearForm(){
 async function generatePDF(){
   var jsPDFLib=window.jspdf;
   var doc=new jsPDFLib.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-  var W=210,H=297,mL=10,mR=10,mT=8;
+  var W=210,H=297,mL=8,mR=8,mT=8;
   var cW=W-mL-mR;
   var y=mT;
 
   var navy=[13,43,94], navy2=[29,95,166], cyan=[0,168,224];
   var white=[255,255,255], gray=[240,244,249], grayBd=[190,210,230];
   var text_=[20,40,60], textSm=[70,100,130];
-  var black=[0,0,0];
+  var accentBg=[232,241,252];
 
   function setC(a){ doc.setTextColor(a[0],a[1],a[2]); }
   function setF(a){ doc.setFillColor(a[0],a[1],a[2]); }
@@ -1241,217 +1241,274 @@ async function generatePDF(){
   var dataVal=document.getElementById('fData').value;
   var dataFmt=dataVal?formatDatePT(dataVal):'';
 
-  // ── LOGO ÁREA ─────────────────────────────────────────
-  // Fundo header branco com borda azul
-  setF([248,251,255]); doc.rect(mL,y,cW,28,'F');
-  setD(navy); doc.setLineWidth(0.5); doc.rect(mL,y,cW,28,'S');
-  // Linha azul esquerda
-  setF(navy2); doc.rect(mL,y,1.5,28,'F');
+  // ═══════════════════════════════════════════════════
+  // BORDA AZUL NA PÁGINA INTEIRA (1.5mm nas laterais)
+  // ═══════════════════════════════════════════════════
+  function drawPageBorder(){
+    setD(navy2); doc.setLineWidth(1.2);
+    doc.rect(2,2,W-4,H-4,'S');
+    setD(cyan); doc.setLineWidth(0.4);
+    doc.rect(3.2,3.2,W-6.4,H-6.4,'S');
+  }
+  drawPageBorder();
 
-  // Tentar logo
-  try {
-    // placeholder para logo
-  } catch(e){}
+  // ═══════════════════════════════════════════════════
+  // CABEÇALHO COM LOGO + NOME EMPRESA
+  // ═══════════════════════════════════════════════════
+  var headerH=32;
+  setF([248,251,255]); doc.rect(mL,y,cW,headerH,'F');
+  setD(navy); doc.setLineWidth(0.4); doc.rect(mL,y,cW,headerH,'S');
+  // Faixa azul esquerda
+  setF(navy); doc.rect(mL,y,2,headerH,'F');
+  // Faixa diagonal decorativa direita
+  setF([224,235,248]); doc.rect(mL+cW-28,y,28,headerH,'F');
+  setD(navy2); doc.setLineWidth(0.3);
+  doc.line(mL+cW-32,y,mL+cW-28,y+headerH);
 
-  // Nome empresa grande
-  doc.setFont('helvetica','bold'); doc.setFontSize(16); setC(navy);
-  doc.text(EMPRESA.razaoSocial, mL+6, y+9);
-  doc.setFont('helvetica','bold'); doc.setFontSize(11.5); setC(navy2);
-  doc.text(EMPRESA.fantasia, mL+6, y+15.5);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); setC(textSm);
-  doc.text('CNPJ: '+EMPRESA.cnpj+' – Insc. Estadual nº: '+EMPRESA.ie, mL+6, y+21);
-  doc.text('Localizado na '+EMPRESA.endereco+' – Centro – '+EMPRESA.cidade+'/'+EMPRESA.uf+'.', mL+6, y+25.5);
-  y+=32;
+  // Logo (quadrado branco à esquerda)
+  var logoBoxW=38, logoBoxH=28, logoBoxX=mL+4, logoBoxY=y+2;
+  setF(white); doc.roundedRect(logoBoxX,logoBoxY,logoBoxW,logoBoxH,2,2,'F');
+  setD([200,215,235]); doc.setLineWidth(0.3); doc.roundedRect(logoBoxX,logoBoxY,logoBoxW,logoBoxH,2,2,'S');
+
+  // Tentar inserir imagem da logo
+  var logoEl=document.getElementById('lnLogoImg')||document.getElementById('hdLogoImg');
+  if(logoEl&&logoEl.complete&&logoEl.naturalWidth>0&&logoEl.src&&!logoEl.src.endsWith('logo.png')){
+    try{
+      var logoCanvas=document.createElement('canvas');
+      logoCanvas.width=logoEl.naturalWidth; logoCanvas.height=logoEl.naturalHeight;
+      var logoCtx=logoCanvas.getContext('2d'); logoCtx.drawImage(logoEl,0,0);
+      var logoData=logoCanvas.toDataURL('image/png');
+      var lW=logoBoxW-4, lH=logoBoxH-4;
+      var ar=logoEl.naturalWidth/logoEl.naturalHeight;
+      if(ar>1){ lH=lW/ar; } else { lW=lH*ar; }
+      doc.addImage(logoData,'PNG',logoBoxX+(logoBoxW-lW)/2,logoBoxY+(logoBoxH-lH)/2,lW,lH);
+    }catch(ex){
+      // fallback texto JCG
+      doc.setFont('helvetica','bold'); doc.setFontSize(18); setC(navy);
+      doc.text('JCG',logoBoxX+logoBoxW/2,logoBoxY+logoBoxH/2+2,{align:'center'});
+    }
+  } else {
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); setC(navy);
+    doc.text('JCG',logoBoxX+logoBoxW/2,logoBoxY+logoBoxH/2+1,{align:'center'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(6); setC(navy2);
+    doc.text('J.C.G. DA COSTA-EPP',logoBoxX+logoBoxW/2,logoBoxY+logoBoxH/2+6,{align:'center'});
+  }
+
+  // Textos da empresa à direita da logo
+  var txtX=mL+logoBoxW+8;
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); setC(navy);
+  doc.text('J. C. G. DA COSTA - EPP', txtX, y+10);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10.5); setC(navy2);
+  doc.text('IRMÃOS COSTA e-LICITAÇÕES', txtX, y+17);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
+  doc.text('CNPJ: '+EMPRESA.cnpj+' – Insc. Estadual nº: '+EMPRESA.ie, txtX, y+22.5);
+  doc.text('Localizado na '+EMPRESA.endereco+' – Centro – '+EMPRESA.cidade+'/'+EMPRESA.uf+'.', txtX, y+27);
+  y+=headerH+3;
 
   // ── TÍTULO FORMULÁRIO ─────────────────────────────────
   setF(navy); doc.rect(mL,y,cW,8,'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(10); setC(white);
   doc.text('FORMULÁRIO PADRÃO: Proposta de Preço', W/2, y+5.5, {align:'center'});
   y+=8;
-  setF([224,235,248]); doc.rect(mL,y,cW,6,'F');
-  setD(grayBd); doc.setLineWidth(0.3); doc.rect(mL,y,cW,6,'S');
+  setF(accentBg); doc.rect(mL,y,cW,6,'F');
+  setD(navy2); doc.setLineWidth(0.3); doc.rect(mL,y,cW,6,'S');
   doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setC(navy);
-  doc.text((pregao||'EDITAL')+' – '+(lote?'SRP Nº '+lote:''), W/2, y+4, {align:'center'});
+  var tituloEdital=(pregao||'EDITAL')+(lote?' – SRP Nº '+lote:'');
+  doc.text(tituloEdital, W/2, y+4.2, {align:'center'});
   y+=9;
 
-  // ── PROPONENTE ────────────────────────────────────────
-  setF([232,241,252]); doc.rect(mL,y,cW,5,'F');
-  setD(navy); doc.setLineWidth(0.3); doc.rect(mL,y,cW,5,'S');
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
-  doc.text('PROPONENTE', W/2, y+3.5, {align:'center'});
-  y+=5;
+  // ═══════════════════════════════════════════════════
+  // PROPONENTE — layout em grid de células bem definidas
+  // ═══════════════════════════════════════════════════
+  // Título seção
+  setF(navy); doc.rect(mL,y,cW,6,'F');
+  setF(navy2); doc.rect(mL,y,2,6,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); setC(white);
+  doc.text('PROPONENTE', W/2, y+4.3, {align:'center'});
+  y+=6;
 
-  // Box proponente
-  setF(white); doc.rect(mL,y,cW,40,'F');
-  setD(grayBd); doc.setLineWidth(0.3); doc.rect(mL,y,cW,40,'S');
-
-  // linhas horizontais internas
-  var rows_p=[7,13,19,25,32];
-  rows_p.forEach(function(ry){ setD(grayBd); doc.line(mL,y+ry,mL+cW,y+ry); });
-  // linha vertical meio
-  doc.line(W/2,y+19,W/2,y+40);
-  doc.line(W/2,y+13,mL+cW,y+13);
-
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); setC(text_);
-  function cell(lbl,val,x1,x2,yy){
-    doc.setFont('helvetica','bold'); setC(textSm); doc.text(lbl,x1+1,yy-1.5);
-    doc.setFont('helvetica','normal'); setC(text_); doc.text(val||'',x1+1,yy+2.5);
+  // Função para desenhar célula do grid
+  function propCell(lbl, val, x, cellY, cellW, cellH, bgColor){
+    setF(bgColor||white); doc.rect(x,cellY,cellW,cellH,'F');
+    setD([180,205,230]); doc.setLineWidth(0.25); doc.rect(x,cellY,cellW,cellH,'S');
+    // Label topo
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); setC([100,130,165]);
+    doc.text(lbl, x+2, cellY+3.8);
+    // Valor
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setC(text_);
+    var valLines=doc.splitTextToSize(String(val||'—'), cellW-4);
+    doc.text(valLines[0]||'', x+2, cellY+8.5);
   }
-  doc.setFont('helvetica','bold'); setC(textSm); doc.setFontSize(8); doc.text('Nome de Fantasia:',mL+1,y+4);
-  doc.setFont('helvetica','normal'); setC(text_); doc.setFontSize(9); doc.text('"'+EMPRESA.fantasia+'"',mL+28,y+4.5);
-  doc.setFont('helvetica','normal'); setC(textSm); doc.setFontSize(8); doc.text('Optante pelo SIMPLES? '+EMPRESA.optante+'.',W/2+1,y+4.5);
-  doc.setFont('helvetica','bold'); setC(textSm); doc.setFontSize(8); doc.text('Razão Social:',mL+1,y+9.5);
-  doc.setFont('helvetica','bold'); setC(text_); doc.setFontSize(9); doc.text(EMPRESA.razaoSocial,mL+22,y+9.5);
-  doc.setFont('helvetica','bold'); setC(textSm); doc.setFontSize(8); doc.text('CNPJ:',mL+1,y+16);
-  doc.setFont('helvetica','bold'); setC(text_); doc.text(EMPRESA.cnpj,mL+10,y+16);
-  doc.setFont('helvetica','bold'); setC(textSm); doc.text('Endereço:',mL+1,y+22);
-  doc.setFont('helvetica','normal'); setC(text_); doc.text('RUA '+EMPRESA.endereco.replace('Av. ','').toUpperCase(),mL+14,y+22);
-  doc.setFont('helvetica','bold'); setC(textSm); doc.text('Bairro:',mL+1,y+28);
-  doc.setFont('helvetica','normal'); setC(text_); doc.text('CENTRO',mL+11,y+28);
-  doc.setFont('helvetica','bold'); setC(textSm); doc.text('Cidade:',W/2+1,y+28);
-  doc.setFont('helvetica','normal'); setC(text_); doc.text(EMPRESA.cidade.toUpperCase()+' - '+EMPRESA.uf,W/2+11,y+28);
-  doc.setFont('helvetica','bold'); setC(textSm); doc.text('CEP:',mL+1,y+35);
-  doc.setFont('helvetica','normal'); setC(text_); doc.text('69.640-000',mL+9,y+35);
-  doc.setFont('helvetica','bold'); setC(textSm); doc.text('E-mail:',mL+30,y+35);
-  doc.setFont('helvetica','normal'); setC(text_); doc.text(EMPRESA.email1,mL+43,y+35);
-  doc.setFont('helvetica','bold'); setC(textSm); doc.text('Telefone / CEL:',mL+1,y+39);
-  doc.setFont('helvetica','normal'); setC(text_); doc.text(EMPRESA.tel,mL+24,y+39);
-  doc.setFont('helvetica','bold'); setC(textSm); doc.text('Banco:',mL+50,y+39);
-  doc.setFont('helvetica','normal'); setC(text_); doc.text(EMPRESA.banco+' Agência: '+EMPRESA.agencia+' OP: '+EMPRESA.op+' Conta: '+EMPRESA.conta,mL+61,y+39);
-  y+=43;
 
-  // ── TABELA DE ITENS ───────────────────────────────────
+  var rH=12; // altura de cada linha de célula
+  // Linha 1: Nome Fantasia | Optante SIMPLES
+  var col1w=cW*0.65, col2w=cW*0.35;
+  propCell('Nome de Fantasia', '"'+EMPRESA.fantasia+'"', mL, y, col1w, rH, [248,251,255]);
+  propCell('Optante pelo SIMPLES?', EMPRESA.optante, mL+col1w, y, col2w, rH, [248,251,255]);
+  y+=rH;
+  // Linha 2: Razão Social (full width)
+  propCell('Razão Social', EMPRESA.razaoSocial, mL, y, cW, rH, accentBg);
+  y+=rH;
+  // Linha 3: CNPJ | Inscrição Estadual
+  propCell('CNPJ', EMPRESA.cnpj, mL, y, col1w, rH);
+  propCell('Inscrição Estadual', EMPRESA.ie, mL+col1w, y, col2w, rH);
+  y+=rH;
+  // Linha 4: Endereço (full width)
+  var endFull='Av. Castelo Branco, 173 – Centro – '+EMPRESA.cidade+'/'+EMPRESA.uf;
+  propCell('Endereço', endFull, mL, y, cW, rH, [248,251,255]);
+  y+=rH;
+  // Linha 5: CEP | Bairro | Cidade
+  var c3=cW/3;
+  propCell('CEP', '69.640-000', mL, y, c3, rH);
+  propCell('Bairro', 'CENTRO', mL+c3, y, c3, rH);
+  propCell('Cidade/UF', EMPRESA.cidade.toUpperCase()+' – '+EMPRESA.uf, mL+c3*2, y, c3, rH);
+  y+=rH;
+  // Linha 6: Telefone | E-mail
+  propCell('Telefone / CEL', EMPRESA.tel, mL, y, col1w, rH, accentBg);
+  propCell('E-mail', EMPRESA.email1, mL+col1w, y, col2w, rH, accentBg);
+  y+=rH;
+  // Linha 7: Banco | Agência | Conta
+  var bw1=cW*0.45, bw2=cW*0.2, bw3=cW*0.15, bw4=cW*0.2;
+  propCell('Banco', EMPRESA.banco, mL, y, bw1, rH);
+  propCell('Agência', EMPRESA.agencia+' OP: '+EMPRESA.op, mL+bw1, y, bw2+bw3, rH);
+  propCell('Conta Corrente', EMPRESA.conta, mL+bw1+bw2+bw3, y, bw4, rH);
+  y+=rH+4;
+
+  // ═══════════════════════════════════════════════════
+  // TABELA DE ITENS
+  // ═══════════════════════════════════════════════════
   var items=getItems();
-  // Larguras colunas — total cW
-  var col={item:10, desc:0, marca:18, fabric:18, un:12, qtd:12, unit:22, total:22};
-  var imgCol=15;
+  // Colunas: item=10, desc=variável, marca=22, fabric=22, un=13, qtd=13, unit=26, total=26, img=16
+  var col={item:10, marca:22, fabric:22, un:13, qtd:13, unit:26, total:26};
+  var imgCol=16;
   col.desc=cW-col.item-col.marca-col.fabric-col.un-col.qtd-col.unit-col.total-imgCol;
 
-  // Header tabela
-  setF(navy); doc.rect(mL,y,cW,6.5,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setC(white);
+  // Header da tabela
+  setF(navy); doc.rect(mL,y,cW,7,'F');
+  setF(navy2); doc.rect(mL,y,2,7,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); setC(white);
   var hx=mL;
   [['ITEM',col.item],['DESCRIÇÃO DETALHADA',col.desc],['MARCA',col.marca],['FABRICANTE',col.fabric],
-   ['UNID.',col.un],['QTDE',col.qtd],['VALOR\nUNITÁRIO',col.unit],['VALOR\nTOTAL',col.total],['FOTO',imgCol]
+   ['UNID.',col.un],['QTDE',col.qtd],['VALOR UNITÁRIO',col.unit],['VALOR TOTAL',col.total],['FOTO',imgCol]
   ].forEach(function(h){
-    doc.text(h[0],hx+h[1]/2,y+4.5,{align:'center',maxWidth:h[1]-1});
+    doc.text(h[0],hx+h[1]/2,y+4.6,{align:'center',maxWidth:h[1]-1});
     hx+=h[1];
   });
-  y+=6.5;
+  y+=7;
   setD(grayBd); doc.setLineWidth(0.2);
 
   var grandTotal=0;
   for(var i=0;i<items.length;i++){
     var itm=items[i];
     grandTotal+=itm.total;
-    // calcular altura da linha
-    var descFull=(itm.nome?itm.nome.toUpperCase()+'\n':'')+((itm.desc||itm.obs)?itm.desc||itm.obs:'');
-    var descLines=doc.splitTextToSize(descFull, col.desc-3);
-    var rowH=Math.max(descLines.length*4.5+6, itm.img?22:10);
-    if(y+rowH>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+2; }
-    var bg=i%2===0?white:[245,248,252];
+
+    // Calcular linhas de descrição
+    var nomeLines=itm.nome?doc.splitTextToSize(itm.nome.toUpperCase(),col.desc-3):[];
+    var obsLines=(itm.desc||itm.obs)?doc.splitTextToSize(itm.desc||itm.obs||'',col.desc-3):[];
+    // Altura: nome + obs + padding pequeno (não excessivo)
+    var textBlockH=(nomeLines.length*4.5)+(obsLines.length>0?obsLines.length*4+2:0)+6;
+    var minH=itm.img?Math.max(textBlockH,22):Math.max(textBlockH,11);
+    var rowH=minH;
+
+    if(y+rowH>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
+    var bg=i%2===0?white:[245,248,253];
     setF(bg); doc.rect(mL,y,cW,rowH,'F');
     setD(grayBd); doc.rect(mL,y,cW,rowH,'S');
-    // linhas verticais
+    // Linhas verticais
     var vx=mL+col.item;
     [col.desc,col.marca,col.fabric,col.un,col.qtd,col.unit,col.total].forEach(function(w){ doc.line(vx,y,vx,y+rowH); vx+=w; });
-    doc.line(vx,y,vx,y+rowH); // img col
-    // Número item
+    doc.line(vx,y,vx,y+rowH);
+
+    // Nº item (centrado verticalmente)
     doc.setFont('helvetica','bold'); doc.setFontSize(9); setC(navy);
     doc.text(String(itm.num).padStart(2,'0'),mL+col.item/2,y+rowH/2+1.5,{align:'center'});
-    // Descrição — nome bold + desc normal
+
+    // Descrição: nome bold em cima + obs menor em baixo, pequena margem no final
     var dy=y+4.5;
     var dx=mL+col.item+1.5;
-    if(itm.nome){
-      var nLines=doc.splitTextToSize(itm.nome.toUpperCase(),col.desc-3);
+    if(nomeLines.length>0){
       doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(text_);
-      doc.text(nLines,dx,dy);
-      dy+=nLines.length*4.5+1.5;
+      doc.text(nomeLines,dx,dy);
+      dy+=nomeLines.length*4.5+1;
     }
-    if(itm.desc||itm.obs){
-      var oLines=doc.splitTextToSize(itm.desc||itm.obs||'',col.desc-3);
-      doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(textSm);
-      doc.text(oLines,dx,dy);
+    if(obsLines.length>0){
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
+      doc.text(obsLines,dx,dy);
+      // dy += obsLines.length*4; // espaço final controlado pelo rowH
     }
+
+    // Colunas centrais (verticalmente centradas)
     var midY=y+rowH/2+1.5;
     var cx2=mL+col.item+col.desc;
-    // Marca
     doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy2);
-    doc.text(doc.splitTextToSize(itm.marca||'',col.marca-2)[0]||'',cx2+col.marca/2,midY,{align:'center'});
-    cx2+=col.marca;
-    // Fabricante
+    doc.text(doc.splitTextToSize(itm.marca||'',col.marca-2)[0]||'',cx2+col.marca/2,midY,{align:'center'}); cx2+=col.marca;
     doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
-    doc.text(doc.splitTextToSize(itm.fabricante||'',col.fabric-2)[0]||'',cx2+col.fabric/2,midY,{align:'center'});
-    cx2+=col.fabric;
-    // UN
+    doc.text(doc.splitTextToSize(itm.fabricante||'',col.fabric-2)[0]||'',cx2+col.fabric/2,midY,{align:'center'}); cx2+=col.fabric;
     doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setC(text_);
     doc.text(itm.un||'UN',cx2+col.un/2,midY,{align:'center'}); cx2+=col.un;
-    // Qtde
-    doc.setFont('helvetica','bold'); setC(text_);
     doc.text(String(itm.qty),cx2+col.qtd/2,midY,{align:'center'}); cx2+=col.qtd;
-    // Vlr Unit
+    // Valor unitário — coluna mais larga, texto completo
     doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
     doc.text(fBRLn(itm.unit),cx2+col.unit/2,midY,{align:'center'}); cx2+=col.unit;
-    // Vlr Total
     doc.setFont('helvetica','bold'); setC(navy);
     doc.text(fBRLn(itm.total),cx2+col.total/2,midY,{align:'center'}); cx2+=col.total;
-    // Foto
+
+    // Foto na coluna dedicada
     if(itm.img){
       try{
         var imgT=itm.img.includes('png')?'PNG':'JPEG';
-        var sz=Math.min(imgCol-2,rowH-2);
+        var sz=Math.min(imgCol-2,rowH-3);
         doc.addImage(itm.img,imgT,cx2+(imgCol-sz)/2,y+(rowH-sz)/2,sz,sz);
       }catch(ex){}
     }
-    // Linha "Valor Unitário por extenso"
+
     y+=rowH;
-    if(y>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+2; }
+
+    // Extensos — sem espaço em branco extra entre linha e extenso
+    if(y>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
     setF([248,252,248]); doc.rect(mL,y,cW,4,'F');
-    setD(grayBd); doc.rect(mL,y,cW,4,'S');
+    setD([210,230,210]); doc.rect(mL,y,cW,4,'S');
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
     doc.text('Valor Unitário: = = = >>>'+valorPorExtenso(itm.unit).toUpperCase(),mL+2,y+2.8);
     y+=4;
-    if(y>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+2; }
-    setF([245,250,245]); doc.rect(mL,y,cW,4,'F');
-    setD(grayBd); doc.rect(mL,y,cW,4,'S');
+    if(y>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
+    setF([244,250,244]); doc.rect(mL,y,cW,4,'F');
+    setD([210,230,210]); doc.rect(mL,y,cW,4,'S');
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
     doc.text('Valor Total: = = = >>>'+valorPorExtenso(itm.total).toUpperCase(),mL+2,y+2.8);
-    y+=5;
+    y+=4.5;
   }
   y+=3;
 
-  // ── VALOR GLOBAL ──────────────────────────────────────
-  if(y+14>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+2; }
+  // ═══════════════════════════════════════════════════
+  // VALOR GLOBAL — cor única navy
+  // ═══════════════════════════════════════════════════
+  if(y+14>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
   var disc=parseFloat(document.getElementById('fDesc').value)||0;
   var grand=grandTotal*(1-disc/100);
-  setF(navy); doc.rect(mL,y,cW*0.7,7,'F');
-  setF(navy2); doc.rect(mL+cW*0.7,y,cW*0.3,7,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(9.5); setC(white);
-  doc.text('VALOR GLOBAL = = = = = >',mL+3,y+4.8);
-  doc.text('R$ '+fBRLn(grand),mL+cW*0.7+4,y+4.8);
-  y+=7;
-  if(y+5>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+2; }
-  setF([230,240,252]); doc.rect(mL,y,cW,5,'F');
-  setD(grayBd); doc.setLineWidth(0.3); doc.rect(mL,y,cW,5,'S');
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
-  doc.text('VALOR GLOBAL : = = = = = >   '+valorPorExtenso(grand).toUpperCase(),mL+2,y+3.5);
+  // Uma única cor navy — label esquerda, valor direita
+  setF(navy); doc.rect(mL,y,cW,8,'F');
+  setF(navy2); doc.rect(mL,y,2,8,'F'); // faixa esquerda
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); setC(white);
+  doc.text('VALOR GLOBAL = = = = = >', mL+5, y+5.5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); setC([200,235,255]);
+  doc.text('R$ '+fBRLn(grand), W-mR-2, y+5.5, {align:'right'});
   y+=8;
 
-  // ── OBSERVAÇÕES ───────────────────────────────────────
-  if(y+38>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+2; }
-  setF(white); doc.rect(mL,y,cW,36,'F');
-  setD(grayBd); doc.setLineWidth(0.3); doc.rect(mL,y,cW,36,'S');
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(textSm);
-  doc.text('Observação:',mL+2,y+4.5);
-  doc.setFont('helvetica','normal'); setC(text_); doc.setFontSize(7.5);
-  doc.text('(1) Os percentuais referentes a tributos deverão ser cotados de acordo com o regime de tributação de cada empresa.',mL+2,y+9);
-  doc.text('(2) Os licitantes não deverão incluir o CSLL e IRPJ nas Planilhas de Preços no quadro de Tributos, conforme Acórdão',mL+2,y+13);
-  doc.text('1.319/2010, 1.696/2010, 1.442/2010 e 950/2007 do Tribunal de Contas da União.',mL+2,y+17);
-  y+=22;
-  doc.setFont('helvetica','normal'); setC(text_); doc.setFontSize(7.5);
-  var obs1='A empresa '+EMPRESA.razaoSocial+', declara que:';
-  doc.setFont('helvetica','bold'); doc.text(obs1,mL+2,y);
-  y+=4;
+  // Linha extenso do valor global
+  if(y+5>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
+  setF(accentBg); doc.rect(mL,y,cW,5.5,'F');
+  setD(navy2); doc.setLineWidth(0.3); doc.rect(mL,y,cW,5.5,'S');
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
+  doc.text('VALOR GLOBAL : = = = = = >   '+valorPorExtenso(grand).toUpperCase(), mL+2, y+3.8);
+  y+=8;
+
+  // ═══════════════════════════════════════════════════
+  // OBSERVAÇÕES — caixa dinâmica que não corta o texto
+  // ═══════════════════════════════════════════════════
+  var obsLinhas1=doc.splitTextToSize('(1) Os percentuais referentes a tributos deverão ser cotados de acordo com o regime de tributação de cada empresa.',cW-6);
+  var obsLinhas2=doc.splitTextToSize('(2) Os licitantes não deverão incluir o CSLL e IRPJ nas Planilhas de Preços no quadro de Tributos, conforme Acórdão 1.319/2010, 1.696/2010, 1.442/2010 e 950/2007 do Tribunal de Contas da União.',cW-6);
+  var obs1txt='A empresa '+EMPRESA.razaoSocial+', declara que:';
   var declaracoes=[
     'a) Nos valores das propostas de preços estão incluídas todas as despesas com tributos e fornecimento de certidões e documentos, bem como encargos fiscais, sociais, trabalhistas, previdenciários, comerciais e outros de qualquer natureza e, ainda, gastos com transportes e acondicionamento em embalagens adequadas, conforme caso;',
     'b) Atende todas as especificações, exigências técnicas mínimas, prazos de entrega e as respectivas quantidades, conforme caso;',
@@ -1459,17 +1516,39 @@ async function generatePDF(){
     'd) Validade mínima da Proposta: '+document.getElementById('fValidade').value+' ('+document.getElementById('fValProp').value+') dias a contar da data da apresentação;',
     'e) Prazo de entrega, execução e demais especificações de acordo com as previsões do Anexo I (Termo de Referência).'
   ];
+  // Calcular altura total necessária para as observações
+  var obsH=5; // padding topo
+  obsH+=4+obsLinhas1.length*3.8+1.5;
+  obsH+=obsLinhas2.length*3.8+3;
+  obsH+=4; // "declara que"
+  declaracoes.forEach(function(d2){ obsH+=doc.splitTextToSize(d2,cW-6).length*3.8+1.5; });
+  obsH+=4; // padding fundo
+
+  if(y+obsH>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
+  var obsY0=y;
+  // Desenha a caixa com altura exata calculada
+  setF(white); doc.rect(mL,obsY0,cW,obsH,'F');
+  setD(navy2); doc.setLineWidth(0.4); doc.rect(mL,obsY0,cW,obsH,'S');
+  setF(navy2); doc.rect(mL,obsY0,2,obsH,'F'); // faixa esquerda
+
+  y=obsY0+5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(textSm);
+  doc.text('Observação:', mL+4, y); y+=4.5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(text_);
+  doc.text(obsLinhas1,mL+4,y); y+=obsLinhas1.length*3.8+1.5;
+  doc.text(obsLinhas2,mL+4,y); y+=obsLinhas2.length*3.8+3;
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setC(text_);
+  doc.text(obs1txt,mL+4,y); y+=4;
   declaracoes.forEach(function(decl){
-    if(y>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+2; }
-    var lines=doc.splitTextToSize(decl,cW-4);
+    var dLines=doc.splitTextToSize(decl,cW-6);
     doc.setFont('helvetica','normal'); setC(text_); doc.setFontSize(7.5);
-    doc.text(lines,mL+2,y);
-    y+=lines.length*3.8+1.5;
+    doc.text(dLines,mL+4,y);
+    y+=dLines.length*3.8+1.5;
   });
-  y+=6;
+  y=obsY0+obsH+7;
 
   // ── ASSINATURA ────────────────────────────────────────
-  if(y+24>H-18){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+2; }
+  if(y+24>H-18){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
   var cidade_data=EMPRESA.cidade+' - ('+EMPRESA.uf+')., '+dataFmt;
   doc.setFont('helvetica','italic'); doc.setFontSize(9); setC(textSm);
   doc.text(cidade_data, W/2, y, {align:'center'});
@@ -1505,10 +1584,16 @@ function addPdfFooterJCG(doc,W,H,mL,mR){
   var pages=doc.internal.getNumberOfPages();
   for(var i=1;i<=pages;i++){
     doc.setPage(i);
-    doc.setFillColor(13,43,94); doc.rect(0,H-11,W,11,'F');
+    // Borda azul em todas as páginas
+    doc.setDrawColor(29,95,166); doc.setLineWidth(1.2);
+    doc.rect(2,2,W-4,H-4,'S');
+    doc.setDrawColor(0,168,224); doc.setLineWidth(0.4);
+    doc.rect(3.2,3.2,W-6.4,H-6.4,'S');
+    // Rodapé
+    doc.setFillColor(13,43,94); doc.rect(4,H-10,W-8,8,'F');
     doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(200,220,240);
-    doc.text(EMPRESA.razaoSocial+' | CNPJ: '+EMPRESA.cnpj+' | '+EMPRESA.cidade+' – '+EMPRESA.uf, mL, H-4);
-    doc.text('Pág. '+i+' de '+pages, W-mR, H-4, {align:'right'});
+    doc.text(EMPRESA.razaoSocial+' | CNPJ: '+EMPRESA.cnpj+' | '+EMPRESA.cidade+' – '+EMPRESA.uf, mL+2, H-5);
+    doc.text('Pág. '+i+' de '+pages, W-mR-2, H-5, {align:'right'});
   }
 }
 
@@ -1525,7 +1610,9 @@ function valorPorExtenso(n){
     if(n===100) return 'cem';
     var s='';
     var cent=Math.floor(n/100), dez=Math.floor((n%100)/10), uni=n%10;
-    if(cent) s+=c[cent];
+    // 101-199: "cento e ..." não "cem e ..."
+    if(cent===1 && n>100) s='cento';
+    else if(cent>1) s=c[cent];
     if(dez>=2){ if(s) s+=' e '; s+=d[dez]; if(uni){ s+=' e '+u[uni]; } }
     else if(n%100<20&&n%100>0){ if(s) s+=' e '; s+=u[n%100]; }
     return s;

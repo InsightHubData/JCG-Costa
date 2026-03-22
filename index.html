@@ -938,9 +938,8 @@ var EMPRESA = {
    USUÁRIOS
 ═══════════════════════════════════════ */
 var USERS = {
-  'admin':    { senha:'admin123', nome:'Administrador' },
-  'jcg':      { senha:'jcg2025',  nome:'J.C.G. da Costa' },
-  'comercial':{ senha:'comercial123', nome:'Equipe Comercial' }
+  'jcg comercial': { senha:'JCG2026@', nome:'JCG Comercial' },
+  'admin':         { senha:'admin123', nome:'Administrador' }
 };
 
 var currentUser = null;
@@ -979,7 +978,7 @@ function saveLSProd(){
 function doLogin(e){
   e.preventDefault();
   var u = document.getElementById('uIn').value.trim().toLowerCase();
-  var p = document.getElementById('pIn').value;
+  var p = document.getElementById('pIn').value.trim();
   var user = USERS[u];
   if(user && user.senha===p){
     currentUser=u;

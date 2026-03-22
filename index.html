@@ -403,7 +403,7 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
         </div>
         <button type="submit" class="btn-login">🔓 Acessar sistema</button>
       </form>
-      <div class="lc-footer">J. C. G. da Costa — EPP &nbsp;·&nbsp; CNPJ 05.481.242/0001-68<br>Av. Castelo Branco, 173 — Benjamin Constant / AM</div>
+      <div class="lc-footer">J. C. G. da Costa — EPP &nbsp;·&nbsp; CNPJ 05.481.242/0001-68<br>Rua Santos Dumont, 143 — Tabatinga / AM</div>
     </div>
   </div>
 </div>
@@ -921,8 +921,8 @@ var EMPRESA = {
   fantasia:    'IRMÃOS COSTA e-LICITAÇÃO',
   cnpj:        '05.481.242/0001-68',
   ie:          '04.208.197-1',
-  endereco:    'Av. Castelo Branco, 173 – Centro',
-  cidade:      'Benjamin Constant',
+  endereco:    'Rua Santos Dumont, 143',
+  cidade:      'Tabatinga',
   uf:          'AM',
   banco:       'CAIXA ECONÔMICA',
   agencia:     '3196',
@@ -1393,7 +1393,7 @@ async function generatePDF(){
   doc.text('IRMÃOS COSTA e-LICITAÇÕES', txtX, y+18);
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
   doc.text('CNPJ: '+EMPRESA.cnpj+' – Insc. Estadual nº: '+EMPRESA.ie, txtX, y+23.5);
-  doc.text('Localizado na '+EMPRESA.endereco+' – Centro – '+EMPRESA.cidade+'/'+EMPRESA.uf+'.', txtX, y+28.5);
+  doc.text('Localizado na '+EMPRESA.endereco+' – Comunicações – '+EMPRESA.cidade+'/'+EMPRESA.uf+'.', txtX, y+28.5);
   y+=headerH+2;
 
   // ── TÍTULO FORMULÁRIO ─────────────────────────────────
@@ -1447,13 +1447,13 @@ async function generatePDF(){
   propCell('Inscrição Estadual', EMPRESA.ie, mL+col1w, y, col2w, rH);
   y+=rH;
   // Linha 4: Endereço (full width)
-  var endFull='Av. Castelo Branco, 173 – Centro – '+EMPRESA.cidade+'/'+EMPRESA.uf;
+  var endFull='Rua Santos Dumont, 143 – Comunicações – '+EMPRESA.cidade+'/'+EMPRESA.uf;
   propCell('Endereço', endFull, mL, y, cW, rH, [248,251,255]);
   y+=rH;
   // Linha 5: CEP | Bairro | Cidade
   var c3=cW/3;
   propCell('CEP', '69.640-000', mL, y, c3, rH);
-  propCell('Bairro', 'CENTRO', mL+c3, y, c3, rH);
+  propCell('Bairro', 'COMUNICAÇÕES', mL+c3, y, c3, rH);
   propCell('Cidade/UF', EMPRESA.cidade.toUpperCase()+' – '+EMPRESA.uf, mL+c3*2, y, c3, rH);
   y+=rH;
   // Linha 6: Telefone | E-mail
@@ -1536,57 +1536,17 @@ async function generatePDF(){
     // Nome: começa em y + padTop + baseline da fonte (lhNome)
     var dyNome=y+padTop+lhNome;
     if(nomeLines.length>0){
-      var dxRight2=mL+col.item+col.desc-2;
       doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
       for(var nl=0;nl<nomeLines.length;nl++){
-        var nLinha=nomeLines[nl];
-        var nIsUltima=(nl===nomeLines.length-1);
-        if(nIsUltima){
-          doc.text(nLinha, dx, dyNome+nl*lhNome);
-        } else {
-          var nPalavras=nLinha.split(' ');
-          if(nPalavras.length<=1){
-            doc.text(nLinha, dx, dyNome+nl*lhNome);
-          } else {
-            var nLargTotal=doc.getTextWidth(nLinha.replace(/ /g,''));
-            var nEspacoTotal=dxRight2-dx-nLargTotal;
-            var nEspacoPorGap=nEspacoTotal/(nPalavras.length-1);
-            var nXAtual=dx;
-            for(var np=0;np<nPalavras.length;np++){
-              doc.text(nPalavras[np], nXAtual, dyNome+nl*lhNome);
-              nXAtual+=doc.getTextWidth(nPalavras[np])+nEspacoPorGap;
-            }
-          }
-        }
+        doc.text(nomeLines[nl], dx, dyNome+nl*lhNome);
       }
     }
-    // Obs: justificado — cada linha esticada até a borda direita da coluna
+    // Obs: texto alinhado à esquerda (sem espaços estranhos)
     if(obsLines.length>0){
       var dyObs=y+padTop+altNome+gapNomeObs+lhObs;
-      var dxRight=mL+col.item+col.desc-2; // borda direita da coluna desc
       doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(text_);
       for(var ol=0;ol<obsLines.length;ol++){
-        var linha=obsLines[ol];
-        var isUltimaLinha=(ol===obsLines.length-1);
-        if(isUltimaLinha){
-          // Última linha: alinhada à esquerda (padrão justificado)
-          doc.text(linha, dx, dyObs+ol*lhObs);
-        } else {
-          // Demais linhas: justificar manualmente distribuindo espaços
-          var palavras=linha.split(' ');
-          if(palavras.length<=1){
-            doc.text(linha, dx, dyObs+ol*lhObs);
-          } else {
-            var largTotal=doc.getTextWidth(linha.replace(/ /g,''));
-            var espacoTotal=dxRight-dx-largTotal;
-            var espacoPorGap=espacoTotal/(palavras.length-1);
-            var xAtual=dx;
-            for(var pw=0;pw<palavras.length;pw++){
-              doc.text(palavras[pw], xAtual, dyObs+ol*lhObs);
-              xAtual+=doc.getTextWidth(palavras[pw])+espacoPorGap;
-            }
-          }
-        }
+        doc.text(obsLines[ol], dx, dyObs+ol*lhObs);
       }
     }
 
@@ -2302,57 +2262,77 @@ function gerarPdfPedido(){
   function fBp(v){ return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2}); }
   function fBpN(v){ return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2}); }
 
-  // Header empresa
-  setF([248,251,255]); doc.rect(mL,y,cW,26,'F');
-  setD(navy); doc.setLineWidth(0.5); doc.rect(mL,y,cW,26,'S');
-  setF(navy2); doc.rect(mL,y,1.5,26,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); setC(navy);
-  doc.text(EMPRESA.razaoSocial, mL+5, y+8);
-  doc.setFont('helvetica','bold'); doc.setFontSize(10); setC(navy2);
-  doc.text(EMPRESA.fantasia, mL+5, y+14);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(textSm);
-  doc.text('CNPJ: '+EMPRESA.cnpj+' – Ins. Estadual: '+EMPRESA.ie, mL+5, y+19);
-  doc.text(EMPRESA.endereco+' – Centro – '+EMPRESA.cidade+'/'+EMPRESA.uf, mL+5, y+23.5);
-  y+=30;
+  // ── Cabeçalho — mesmo padrão da proposta ──
+  var pedHdrH=34;
+  setF([242,247,255]); doc.rect(mL,y,cW,pedHdrH,'F');
+  setD(navy2); doc.setLineWidth(0.5); doc.line(mL,y+pedHdrH,mL+cW,y+pedHdrH);
+  // Triângulo decorativo (reutiliza a função se existir, senão inline)
+  (function(){
+    var xDir=mL+cW, cut=pedHdrH*1.1;
+    setF(navy);          doc.triangle(xDir-cut,y,xDir,y,xDir,y+cut,'F');
+    setF(navy2);         doc.triangle(xDir-cut*0.73,y,xDir,y,xDir,y+cut*0.73,'F');
+    setF([72,140,195]);  doc.triangle(xDir-cut*0.52,y,xDir,y,xDir,y+cut*0.52,'F');
+    setF([90,175,215]);  doc.triangle(xDir-cut*0.35,y,xDir,y,xDir,y+cut*0.35,'F');
+    setF([130,200,230]); doc.triangle(xDir-cut*0.22,y,xDir,y,xDir,y+cut*0.22,'F');
+    setF([170,220,240]); doc.triangle(xDir-cut*0.12,y,xDir,y,xDir,y+cut*0.12,'F');
+  })();
+  // Logo
+  var pedLogoData=_logoData||'';
+  if(pedLogoData&&pedLogoData.length>500){
+    try{ doc.addImage(pedLogoData,'PNG',mL+3,y+2,38,30); }catch(ex){}
+  }
+  // Textos
+  var pedTxtX=mL+44;
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); setC(navy);
+  doc.text('J. C. G. DA COSTA - EPP', pedTxtX, y+11);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10.5); setC(navy2);
+  doc.text('IRMÃOS COSTA e-LICITAÇÕES', pedTxtX, y+18);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
+  doc.text('CNPJ: '+EMPRESA.cnpj+' – Insc. Estadual nº: '+EMPRESA.ie, pedTxtX, y+23.5);
+  doc.text('Localizado na '+EMPRESA.endereco+' – Comunicações – '+EMPRESA.cidade+'/'+EMPRESA.uf+'.', pedTxtX, y+28.5);
+  y+=pedHdrH+4;
 
   // Título pedido
-  setF(navy); doc.rect(mL,y,cW,7,'F');
+  setF(navy); doc.rect(mL,y,cW,8,'F');
+  setF(navy2); doc.rect(mL,y,3,8,'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(11); setC(white);
-  doc.text('PEDIDO DE VENDA: '+d.num, W/2, y+4.8, {align:'center'});
-  y+=7;
-  setF([224,235,248]); doc.rect(mL,y,cW,5.5,'F');
-  setD(grayBd); doc.setLineWidth(0.3); doc.rect(mL,y,cW,5.5,'S');
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
-  doc.text('PROPOSTA REF: '+(d.cotRef||'—')+(d.pregao?' | '+d.pregao:'')+(d.lote?' | LOTE '+d.lote:''), W/2, y+3.8, {align:'center'});
+  doc.text('PEDIDO DE VENDA: '+d.num, W/2, y+5.5, {align:'center'});
   y+=8;
+  setF([232,241,252]); doc.rect(mL,y,cW,6,'F');
+  setD(navy2); doc.setLineWidth(0.3);
+  doc.line(mL,y,mL+cW,y); doc.line(mL,y+6,mL+cW,y+6);
+  doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setC(navy);
+  doc.text('PROPOSTA REF: '+(d.cotRef||'—')+(d.pregao?' | '+d.pregao:'')+(d.lote?' | LOTE '+d.lote:''), W/2, y+4.2, {align:'center'});
+  y+=9;
 
-  // Info boxes
-  var bw=(cW-6)/4;
+  // Info boxes — espaçados e limpos
+  var bw=(cW-3)/4;
   [['ORDEM DE FORNECIMENTO',d.ordemFornec||'—'],['DATA DO PEDIDO',d.data?new Date(d.data+'T12:00:00').toLocaleDateString('pt-BR'):'—'],
    ['DATA PREVISTA ENTREGA',d.dataPrevista?new Date(d.dataPrevista+'T12:00:00').toLocaleDateString('pt-BR'):'—'],['E-MAIL',d.email||EMPRESA.email2]
   ].forEach(function(pair,i){
-    var bx=mL+i*(bw+2);
-    setF([232,241,252]); doc.roundedRect(bx,y,bw,10,1,1,'F');
-    setD(grayBd); doc.setLineWidth(0.2); doc.roundedRect(bx,y,bw,10,1,1,'S');
-    setF(navy2); doc.rect(bx,y,1,10,'F');
-    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); setC(textSm);
-    doc.text(pair[0],bx+3,y+3.5);
-    doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(text_);
-    doc.text(String(pair[1]).substring(0,26),bx+3,y+8);
+    var bx=mL+i*(bw+1);
+    setF([232,241,252]); doc.roundedRect(bx,y,bw,12,1.5,1.5,'F');
+    setD([180,205,230]); doc.setLineWidth(0.2); doc.roundedRect(bx,y,bw,12,1.5,1.5,'S');
+    setF(navy2); doc.rect(bx,y,2.5,12,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); setC([100,130,165]);
+    doc.text(pair[0],bx+5,y+4.5);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setC(text_);
+    doc.text(String(pair[1]).substring(0,26),bx+5,y+9.5);
   });
-  y+=14;
+  y+=16;
 
-  // Cliente box
-  setF(white); doc.rect(mL,y,cW,18,'F');
-  setD(grayBd); doc.setLineWidth(0.3); doc.rect(mL,y,cW,18,'S');
-  setF(navy2); doc.rect(mL,y,1.5,18,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setC(textSm); doc.text('CLIENTE / DESTINATÁRIO',mL+4,y+4);
-  doc.setFont('helvetica','bold'); doc.setFontSize(9.5); setC(navy); doc.text(d.orgao||'—',mL+4,y+9.5);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(textSm);
-  doc.text('CNPJ: '+(d.cnpjOrgao||'—')+'   I.E.: '+(d.ieOrgao||'NÃO CONTRIBUINTE'),mL+4,y+14.5);
+  // Cliente box — espaçado e limpo
+  setF([248,251,255]); doc.rect(mL,y,cW,22,'F');
+  setD([180,205,230]); doc.setLineWidth(0.3); doc.rect(mL,y,cW,22,'S');
+  setF(navy); doc.rect(mL,y,3,22,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); setC([100,130,165]);
+  doc.text('CLIENTE / DESTINATÁRIO',mL+6,y+4);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); setC(navy);
+  doc.text(d.orgao||'—',mL+6,y+10);
   doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
-  doc.text(doc.splitTextToSize('Endereço: '+(d.enderecoOrgao||'—'),cW-60)[0]||'',mL+4,y+18.5);
-  y+=21;
+  doc.text('CNPJ: '+(d.cnpjOrgao||'—')+'   I.E.: '+(d.ieOrgao||'NÃO CONTRIBUINTE'),mL+6,y+15.5);
+  doc.text(doc.splitTextToSize('Endereço: '+(d.enderecoOrgao||'—'),cW-10)[0]||'',mL+6,y+20.5);
+  y+=26;
 
   // Tabela itens
   var col2={num:10,nome:0,marca:22,fabric:22,un:14,qtd:14,unit:24,total:24};
@@ -2403,16 +2383,18 @@ function gerarPdfPedido(){
 
   // Total global
   if(y+10>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=10; }
-  setF(navy); doc.rect(mL,y,cW*0.65,7,'F');
-  setF(navy2); doc.rect(mL+cW*0.65,y,cW*0.35,7,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); setC(white);
-  doc.text('VALOR GLOBAL = = = = = >',mL+2,y+4.8);
-  doc.text('R$ '+fBpN(d.grand),mL+cW*0.65+4,y+4.8);
-  y+=7;
-  setF([230,240,252]); doc.rect(mL,y,cW,4.5,'F');
-  setD(grayBd); doc.rect(mL,y,cW,4.5,'S');
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setC(navy);
-  doc.text('VALOR GLOBAL : = = = = = >   '+valorPorExtenso(d.grand).toUpperCase(),mL+2,y+3.2);
+  setF(navy); doc.rect(mL,y,cW,8,'F');
+  setF(navy2); doc.rect(mL,y,3,8,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); setC(white);
+  doc.text('VALOR GLOBAL = = = = = >', mL+5, y+5.5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); setC([200,235,255]);
+  doc.text('R$ '+fBpN(d.grand), W-mR-2, y+5.5, {align:'right'});
+  y+=8;
+  setF([232,241,252]); doc.rect(mL,y,cW,5.5,'F');
+  setD(navy2); doc.setLineWidth(0.3);
+  doc.line(mL,y,mL+cW,y); doc.line(mL,y+5.5,mL+cW,y+5.5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
+  doc.text('VALOR GLOBAL : = = = = = >   '+valorPorExtenso(d.grand).toUpperCase(),mL+2,y+3.8);
   y+=8;
 
   // Transportador

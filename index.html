@@ -1261,30 +1261,41 @@ async function generatePDF(){
   })();
 
   // ── Triângulo decorativo NO cabeçalho, canto superior direito ──
-  // yTopo = y inicial do cabeçalho, hH = altura do cabeçalho
+  // Reproduz o efeito da imagem: listras diagonais paralelas (navy → azul → ciano)
   function drawTrianguloNoHeader(yTopo, hH){
-    // Triângulo ocupa canto sup direito dentro do cabeçalho
-    var xDir=mL+cW; // borda direita do cabeçalho
-    var cut=hH;     // triângulo isósceles que preenche o canto
-    // Camadas de fundo para frente (igual à imagem)
+    var xDir=mL+cW;  // borda direita
+    var cut=hH*1.1;  // triângulo ligeiramente maior que o header
+    // Triângulo base (todo navy escuro — fundo)
     setF(navy);
     doc.triangle(xDir-cut, yTopo, xDir, yTopo, xDir, yTopo+cut, 'F');
+    // Listras diagonais: cada listra é um triângulo menor sobre o anterior
+    // Listra navy2 (azul médio)
+    var s=cut*0.27;
     setF(navy2);
-    doc.triangle(xDir-cut+7, yTopo, xDir, yTopo, xDir, yTopo+cut-7, 'F');
-    setF([100,170,210]);
-    doc.triangle(xDir-cut+14, yTopo, xDir, yTopo, xDir, yTopo+cut-14, 'F');
-    setF([140,200,230]);
-    doc.triangle(xDir-cut+20, yTopo, xDir, yTopo, xDir, yTopo+cut-20, 'F');
-    setF([175,220,242]);
-    doc.triangle(xDir-cut+25, yTopo, xDir, yTopo, xDir, yTopo+cut-25, 'F');
+    doc.triangle(xDir-cut+s, yTopo, xDir, yTopo, xDir, yTopo+cut-s, 'F');
+    // Listra azul aço
+    s=cut*0.48;
+    setF([72,140,195]);
+    doc.triangle(xDir-cut+s, yTopo, xDir, yTopo, xDir, yTopo+cut-s, 'F');
+    // Listra ciano médio
+    s=cut*0.65;
+    setF([90,175,215]);
+    doc.triangle(xDir-cut+s, yTopo, xDir, yTopo, xDir, yTopo+cut-s, 'F');
+    // Listra ciano claro
+    s=cut*0.78;
+    setF([130,200,230]);
+    doc.triangle(xDir-cut+s, yTopo, xDir, yTopo, xDir, yTopo+cut-s, 'F');
+    // Listra mais clara no topo (highlight)
+    s=cut*0.88;
+    setF([170,220,240]);
+    doc.triangle(xDir-cut+s, yTopo, xDir, yTopo, xDir, yTopo+cut-s, 'F');
   }
 
   // ── Cabeçalho compacto para pág 2, 3... (com triângulo) ──
   function drawPageHeader(yPos, logoDataArg){
     var hH=16;
-    // Fundo
-    setF([240,246,255]); doc.rect(mL,yPos,cW,hH,'F');
-    setF([228,238,252]); doc.rect(mL,yPos+hH*0.5,cW,hH*0.5,'F');
+    // Fundo cor única — igual ao print
+    setF([242,247,255]); doc.rect(mL,yPos,cW,hH,'F');
     // Triângulo no canto sup direito
     drawTrianguloNoHeader(yPos, hH);
     // Linha inferior
@@ -1305,10 +1316,9 @@ async function generatePDF(){
   // CABEÇALHO COM LOGO + NOME EMPRESA
   // ═══════════════════════════════════════════════════
   var headerH=34;
-  // Fundo do cabeçalho — duas faixas suaves
-  setF([240,246,255]); doc.rect(mL,y,cW,headerH,'F');
-  setF([228,238,252]); doc.rect(mL,y+headerH*0.55,cW,headerH*0.45,'F');
-  // Linha inferior do cabeçalho
+  // Fundo do cabeçalho — cor única, limpa, igual ao print
+  setF([242,247,255]); doc.rect(mL,y,cW,headerH,'F');
+  // Linha inferior do cabeçalho (azul fina)
   setD(navy2); doc.setLineWidth(0.5); doc.line(mL,y+headerH,mL+cW,y+headerH);
   // Triângulo decorativo no canto superior direito DO cabeçalho
   drawTrianguloNoHeader(y, headerH);
@@ -1487,7 +1497,25 @@ async function generatePDF(){
     // Largura disponível para texto — margem de 2mm de cada lado
     var descW=col.desc-4; // col.desc menos 2mm esq + 2mm dir
     var nomeLines=itm.nome?doc.splitTextToSize(itm.nome.toUpperCase(),descW):[];
-    var obsText=(itm.desc||itm.obs||'').trim();
+    // Normalizar texto da descrição: corrigir OCR, reunir palavras quebradas
+    var obsRaw=(itm.desc||itm.obs||'').trim();
+    // 1. Corrigir espaços dentro de palavras com acentos (OCR: "ADIÇ ÃO" → "ADIÇÃO")
+    obsRaw=obsRaw.replace(/([A-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇÜ])\s([ÃÕÂÊÎÔÛÁÉÍÓÚÀÇÜ])/g,'$1$2');
+    // 2. Reunir linhas quebradas no meio da frase (linha que não termina com ponto/vírgula)
+    //    Substitui 
+ entre palavras por espaço — mantém 
+ após pontuação
+    obsRaw=obsRaw.replace(/([^.;:
+])
+([a-záéíóúàâêîôûãõçüA-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇÜ0-9])/g,'$1 $2');
+    // 3. Remover quebras de linha múltiplas (mais de 1 linha em branco)
+    obsRaw=obsRaw.replace(/
+{3,}/g,'
+
+');
+    // 4. Remover espaços duplicados
+    obsRaw=obsRaw.replace(/  +/g,' ').trim();
+    var obsText=obsRaw;
     var obsLines=obsText?doc.splitTextToSize(obsText,descW):[];
     // Espaçamento de linha em mm para cada tamanho de fonte
     var lhNome=3.5;  // fontSize 8pt

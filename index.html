@@ -1245,36 +1245,23 @@ async function generatePDF(){
   // BORDA AZUL NA PÁGINA INTEIRA (1.5mm nas laterais)
   // ═══════════════════════════════════════════════════
   function drawPageBorder(){
-    var cut=20; // tamanho do corte da quina
-    // ── Sombra externa (efeito profundidade) ──
-    // Várias camadas de cinza translúcido simulam sombra
-    var shadowLayers=[[220,228,238,1.8],[200,212,228,1.2],[180,198,220,0.7]];
-    shadowLayers.forEach(function(sl,si){
-      var off=si+1;
-      doc.setDrawColor(sl[0],sl[1],sl[2]); doc.setLineWidth(sl[3]);
-      // Só topo e rodapé com sombra (sem laterais)
-      doc.line(4+off,4+off, W-4-cut+off,4+off);          // topo sombra
-      doc.line(W-4-cut+off,4+off, W-4+off,4+cut+off);    // diagonal sombra
-      doc.line(4+off,H-4+off, W-4+off,H-4+off);          // rodapé sombra
-    });
-    // ── Linha principal navy — só topo + diagonal + rodapé ──
-    setD(navy2); doc.setLineWidth(1.4);
-    doc.line(4,4, W-4-cut,4);          // topo
-    doc.line(W-4-cut,4, W-4,4+cut);    // diagonal quina
-    doc.line(4,H-4, W-4,H-4);          // rodapé
-    // ── Linha interna ciano — idem ──
-    setD(cyan); doc.setLineWidth(0.5);
-    doc.line(5.5,5.5, W-5.5-cut+1,5.5);
-    doc.line(W-5.5-cut+1,5.5, W-5.5,5.5+cut-1);
-    doc.line(5.5,H-5.5, W-5.5,H-5.5);
-    // ── Triângulo decorativo preenchido na quina ──
-    setF(navy2);
-    doc.triangle(W-4-cut,4, W-4,4, W-4,4+cut,'F');
+    // Apenas o triângulo decorativo da quina superior direita do cabeçalho
+    // Igual à imagem: degradê de triângulos navy/azul sobre o fundo do header
+    // Nada mais — sem linhas, sem bordas, sem rodapé
+    var hH=36; // altura do cabeçalho
+    var cut=32; // tamanho do triângulo
+    // Triângulo de fundo (navy escuro)
     setF(navy);
-    doc.triangle(W-6-cut+2,6, W-6,6, W-6,6+cut-2,'F');
-    // Pequeno acento ciano na quina
-    setF(cyan);
-    doc.triangle(W-7-cut+4,7, W-7,7, W-7,7+cut-4,'F');
+    doc.triangle(W-mL-cut, mT, W-mL, mT, W-mL, mT+cut, 'F');
+    // Triângulo médio (navy2 azul)
+    setF(navy2);
+    doc.triangle(W-mL-cut+6, mT, W-mL, mT, W-mL, mT+cut-6, 'F');
+    // Triângulo frontal (ciano claro — igual ao da imagem)
+    setF([130,195,230]);
+    doc.triangle(W-mL-cut+13, mT, W-mL, mT, W-mL, mT+cut-13, 'F');
+    // Highlight branco suave no topo do triângulo
+    setF([180,220,245]);
+    doc.triangle(W-mL-cut+18, mT, W-mL, mT, W-mL, mT+cut-18, 'F');
   }
   drawPageBorder();
 
@@ -1463,15 +1450,16 @@ async function generatePDF(){
     var itm=items[i];
     grandTotal+=itm.total;
 
-    // Calcular linhas de descrição — altura EXATA sem espaço extra
+    // Calcular altura da linha pelo conteúdo real — sem espaço extra
     var nomeLines=itm.nome?doc.splitTextToSize(itm.nome.toUpperCase(),col.desc-4):[];
     var obsLines=(itm.desc||itm.obs)?doc.splitTextToSize(itm.desc||itm.obs||'',col.desc-4):[];
-    // rowH = paddingTopo(3.5) + alturaTexto + paddingBase(2.5)
-    var altNome=nomeLines.length>0?nomeLines.length*4.2:0;
-    var gapNomeObs=nomeLines.length>0&&obsLines.length>0?1:0;
-    var altObs=obsLines.length>0?obsLines.length*3.6:0;
-    var textBlockH=3.5+altNome+gapNomeObs+altObs+2.5;
-    var rowH=itm.img?Math.max(textBlockH,20):Math.max(textBlockH,9);
+    // Cada linha de nome = 4.0mm, cada linha obs = 3.6mm, pad topo=3, base=2
+    var altNome=nomeLines.length*4.0;
+    var altObs=obsLines.length*3.6;
+    var gapNomeObs=(nomeLines.length>0&&obsLines.length>0)?1.5:0;
+    var rowH=Math.ceil(3+altNome+gapNomeObs+altObs+2);
+    if(itm.img&&rowH<20) rowH=20;
+    if(rowH<9) rowH=9;
 
     if(y+rowH>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
     var bg=i%2===0?white:[245,248,253];
@@ -1489,32 +1477,31 @@ async function generatePDF(){
     doc.setFont('helvetica','bold'); doc.setFontSize(9); setC(navy);
     doc.text(String(itm.num).padStart(2,'0'),mL+col.item/2,y+rowH/2+1.5,{align:'center'});
 
-    // Descrição: nome bold em cima + obs menor — dy exato sem espaço extra
-    var dy=y+3.5;
+    // Descrição: nome bold navy + obs padrão sem cor diferente
+    var dy=y+3+4; // topo(3) + primeira linha baseline(4)
     var dx=mL+col.item+1.5;
     if(nomeLines.length>0){
-      doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(text_);
-      doc.text(nomeLines,dx,dy+4);
-      dy+=altNome+gapNomeObs+1;
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
+      doc.text(nomeLines,dx,dy);
+      dy+=altNome+gapNomeObs;
     }
     if(obsLines.length>0){
-      doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
-      doc.text(obsLines,dx,dy+4);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(text_);
+      doc.text(obsLines,dx,dy);
     }
 
     // Colunas centrais (verticalmente centradas)
     var midY=y+rowH/2+1.5;
     var cx2=mL+col.item+col.desc;
-    doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy2);
-    doc.text(doc.splitTextToSize(itm.marca||'',col.marca-2)[0]||'',cx2+col.marca/2,midY,{align:'center'}); cx2+=col.marca;
+    // Todas colunas centrais: mesma fonte/cor padrão
     doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
+    doc.text(doc.splitTextToSize(itm.marca||'',col.marca-2)[0]||'',cx2+col.marca/2,midY,{align:'center'}); cx2+=col.marca;
     doc.text(doc.splitTextToSize(itm.fabricante||'',col.fabric-2)[0]||'',cx2+col.fabric/2,midY,{align:'center'}); cx2+=col.fabric;
-    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setC(text_);
     doc.text(itm.un||'UN',cx2+col.un/2,midY,{align:'center'}); cx2+=col.un;
     doc.text(String(itm.qty),cx2+col.qtd/2,midY,{align:'center'}); cx2+=col.qtd;
-    // Valor unitário — coluna mais larga, texto completo
-    doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
+    // Valor unitário — padrão
     doc.text(fBRLn(itm.unit),cx2+col.unit/2,midY,{align:'center'}); cx2+=col.unit;
+    // Valor total — bold navy (destaque)
     doc.setFont('helvetica','bold'); setC(navy);
     doc.text(fBRLn(itm.total),cx2+col.total/2,midY,{align:'center'}); cx2+=col.total;
 
@@ -1653,35 +1640,9 @@ async function generatePDF(){
 
 function addPdfFooterJCG(doc,W,H,mL,mR){
   var pages=doc.internal.getNumberOfPages();
-  var cut=20;
   for(var i=1;i<=pages;i++){
     doc.setPage(i);
-    // ── Sombra (topo + rodapé) ──
-    var shadowLayers=[[220,228,238,1.8],[200,212,228,1.2],[180,198,220,0.7]];
-    shadowLayers.forEach(function(sl,si){
-      var off=si+1;
-      doc.setDrawColor(sl[0],sl[1],sl[2]); doc.setLineWidth(sl[3]);
-      doc.line(4+off,4+off, W-4-cut+off,4+off);
-      doc.line(W-4-cut+off,4+off, W-4+off,4+cut+off);
-      doc.line(4+off,H-4+off, W-4+off,H-4+off);
-    });
-    // ── Linhas principais — só topo + diagonal + rodapé, SEM laterais ──
-    doc.setDrawColor(29,95,166); doc.setLineWidth(1.4);
-    doc.line(4,4, W-4-cut,4);
-    doc.line(W-4-cut,4, W-4,4+cut);
-    doc.line(4,H-4, W-4,H-4);
-    doc.setDrawColor(0,168,224); doc.setLineWidth(0.5);
-    doc.line(5.5,5.5, W-5.5-cut+1,5.5);
-    doc.line(W-5.5-cut+1,5.5, W-5.5,5.5+cut-1);
-    doc.line(5.5,H-5.5, W-5.5,H-5.5);
-    // ── Triângulo quina ──
-    doc.setFillColor(29,95,166);
-    doc.triangle(W-4-cut,4, W-4,4, W-4,4+cut,'F');
-    doc.setFillColor(13,43,94);
-    doc.triangle(W-6-cut+2,6, W-6,6, W-6,6+cut-2,'F');
-    doc.setFillColor(0,168,224);
-    doc.triangle(W-7-cut+4,7, W-7,7, W-7,7+cut-4,'F');
-    // ── Rodapé ──
+    // Sem bordas — apenas rodapé simples
     doc.setFillColor(13,43,94); doc.rect(mL,H-10,W-mL-mR,8,'F');
     doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(200,220,240);
     doc.text(EMPRESA.razaoSocial+' | CNPJ: '+EMPRESA.cnpj+' | '+EMPRESA.cidade+' – '+EMPRESA.uf, mL+2, H-5);

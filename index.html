@@ -1495,21 +1495,19 @@ async function generatePDF(){
     var itm=items[i];
     grandTotal+=itm.total;
 
-    // Largura disponível para texto — margem de 2mm de cada lado
-    var descW=col.desc-4; // col.desc menos 2mm esq + 2mm dir
+    // Largura disponível — 2mm margem cada lado
+    var descW=col.desc-4;
     var nomeLines=itm.nome?doc.splitTextToSize(itm.nome.toUpperCase(),descW):[];
-    // Limpar texto da descrição — remover espaços duplos e normalizar
+    // Normalizar texto da descrição
     var obsRaw=(itm.desc||itm.obs||'').trim();
-    // Substituir quebras de linha por espaço (texto contínuo)
     obsRaw=obsRaw.split('\n').map(function(ln){ return ln.trim(); }).filter(function(ln){ return ln.length>0; }).join(' ');
-    // Remover espaços duplos
     while(obsRaw.indexOf('  ')>=0){ obsRaw=obsRaw.replace(/  +/g,' '); }
     var obsText=obsRaw;
     var obsLines=obsText?doc.splitTextToSize(obsText,descW):[];
-    // Espaçamento de linha em mm para cada tamanho de fonte
-    var lhNome=3.5;  // fontSize 8pt
-    var lhObs=3.2;   // fontSize 7.5pt
-    var padTop=2.5, padBot=2.5, gap=1.0;
+    // Espaçamento de linha
+    var lhNome=3.5;  // 8pt
+    var lhObs=3.2;   // 7.5pt
+    var padTop=2.5, padBot=4.5, gap=1.0;  // padBot=4.5 → espaço maior no final
     var altNome=nomeLines.length*lhNome;
     var altObs=obsLines.length*lhObs;
     var gapNomeObs=(nomeLines.length>0&&obsLines.length>0)?gap:0;
@@ -1538,18 +1536,57 @@ async function generatePDF(){
     // Nome: começa em y + padTop + baseline da fonte (lhNome)
     var dyNome=y+padTop+lhNome;
     if(nomeLines.length>0){
+      var dxRight2=mL+col.item+col.desc-2;
       doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
-      // Renderizar linha a linha para controle total
       for(var nl=0;nl<nomeLines.length;nl++){
-        doc.text(nomeLines[nl], dx, dyNome+nl*lhNome);
+        var nLinha=nomeLines[nl];
+        var nIsUltima=(nl===nomeLines.length-1);
+        if(nIsUltima){
+          doc.text(nLinha, dx, dyNome+nl*lhNome);
+        } else {
+          var nPalavras=nLinha.split(' ');
+          if(nPalavras.length<=1){
+            doc.text(nLinha, dx, dyNome+nl*lhNome);
+          } else {
+            var nLargTotal=doc.getTextWidth(nLinha.replace(/ /g,''));
+            var nEspacoTotal=dxRight2-dx-nLargTotal;
+            var nEspacoPorGap=nEspacoTotal/(nPalavras.length-1);
+            var nXAtual=dx;
+            for(var np=0;np<nPalavras.length;np++){
+              doc.text(nPalavras[np], nXAtual, dyNome+nl*lhNome);
+              nXAtual+=doc.getTextWidth(nPalavras[np])+nEspacoPorGap;
+            }
+          }
+        }
       }
     }
-    // Obs: logo abaixo do nome sem gap excessivo
+    // Obs: justificado — cada linha esticada até a borda direita da coluna
     if(obsLines.length>0){
       var dyObs=y+padTop+altNome+gapNomeObs+lhObs;
+      var dxRight=mL+col.item+col.desc-2; // borda direita da coluna desc
       doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(text_);
       for(var ol=0;ol<obsLines.length;ol++){
-        doc.text(obsLines[ol], dx, dyObs+ol*lhObs);
+        var linha=obsLines[ol];
+        var isUltimaLinha=(ol===obsLines.length-1);
+        if(isUltimaLinha){
+          // Última linha: alinhada à esquerda (padrão justificado)
+          doc.text(linha, dx, dyObs+ol*lhObs);
+        } else {
+          // Demais linhas: justificar manualmente distribuindo espaços
+          var palavras=linha.split(' ');
+          if(palavras.length<=1){
+            doc.text(linha, dx, dyObs+ol*lhObs);
+          } else {
+            var largTotal=doc.getTextWidth(linha.replace(/ /g,''));
+            var espacoTotal=dxRight-dx-largTotal;
+            var espacoPorGap=espacoTotal/(palavras.length-1);
+            var xAtual=dx;
+            for(var pw=0;pw<palavras.length;pw++){
+              doc.text(palavras[pw], xAtual, dyObs+ol*lhObs);
+              xAtual+=doc.getTextWidth(palavras[pw])+espacoPorGap;
+            }
+          }
+        }
       }
     }
 

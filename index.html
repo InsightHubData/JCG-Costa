@@ -1244,32 +1244,7 @@ async function generatePDF(){
   // ═══════════════════════════════════════════════════
   // BORDA AZUL NA PÁGINA INTEIRA (1.5mm nas laterais)
   // ═══════════════════════════════════════════════════
-  // Triângulo decorativo — apenas na página 1, canto superior direito
-  function drawTrianguloQuina(yTopo){
-    var cut=32;
-    setF(navy);       doc.triangle(W-mL-cut,yTopo,   W-mL,yTopo,   W-mL,yTopo+cut,   'F');
-    setF(navy2);      doc.triangle(W-mL-cut+6,yTopo,  W-mL,yTopo,   W-mL,yTopo+cut-6, 'F');
-    setF([130,195,230]); doc.triangle(W-mL-cut+13,yTopo, W-mL,yTopo, W-mL,yTopo+cut-13,'F');
-    setF([180,220,245]); doc.triangle(W-mL-cut+18,yTopo, W-mL,yTopo, W-mL,yTopo+cut-18,'F');
-  }
-  // Cabeçalho compacto para páginas 2, 3... (sem triângulo)
-  function drawPageHeader(yPos, logoDataArg){
-    var hH=14;
-    setF([240,246,255]); doc.rect(mL,yPos,cW,hH,'F');
-    setF([210,228,248]); doc.rect(mL+cW-18,yPos,18,hH,'F');
-    setD(navy2); doc.setLineWidth(0.4); doc.line(mL,yPos+hH,mL+cW,yPos+hH);
-    // Logo pequena
-    if(logoDataArg&&logoDataArg.length>500){
-      try{ doc.addImage(logoDataArg,'PNG',mL+2,yPos+1,12,12); }catch(ex){}
-    }
-    // Nome empresa
-    doc.setFont('helvetica','bold'); doc.setFontSize(10); setC(navy);
-    doc.text('J. C. G. DA COSTA - EPP', mL+16, yPos+6);
-    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setC(navy2);
-    doc.text('IRMÃOS COSTA e-LICITAÇÕES  |  CNPJ: '+EMPRESA.cnpj, mL+16, yPos+11);
-    return yPos+hH+3;
-  }
-  // Capturar logoData uma vez para reutilizar
+  // ── Capturar logo uma vez para reutilizar em todas as páginas ──
   var _logoData='';
   (function(){
     var logoEls2=[document.getElementById('lnLogoImg'),document.getElementById('hdLogoImg')];
@@ -1284,21 +1259,59 @@ async function generatePDF(){
       }catch(ex){}
     }
   })();
-  drawTrianguloQuina(mT);
+
+  // ── Triângulo decorativo NO cabeçalho, canto superior direito ──
+  // yTopo = y inicial do cabeçalho, hH = altura do cabeçalho
+  function drawTrianguloNoHeader(yTopo, hH){
+    // Triângulo ocupa canto sup direito dentro do cabeçalho
+    var xDir=mL+cW; // borda direita do cabeçalho
+    var cut=hH;     // triângulo isósceles que preenche o canto
+    // Camadas de fundo para frente (igual à imagem)
+    setF(navy);
+    doc.triangle(xDir-cut, yTopo, xDir, yTopo, xDir, yTopo+cut, 'F');
+    setF(navy2);
+    doc.triangle(xDir-cut+7, yTopo, xDir, yTopo, xDir, yTopo+cut-7, 'F');
+    setF([100,170,210]);
+    doc.triangle(xDir-cut+14, yTopo, xDir, yTopo, xDir, yTopo+cut-14, 'F');
+    setF([140,200,230]);
+    doc.triangle(xDir-cut+20, yTopo, xDir, yTopo, xDir, yTopo+cut-20, 'F');
+    setF([175,220,242]);
+    doc.triangle(xDir-cut+25, yTopo, xDir, yTopo, xDir, yTopo+cut-25, 'F');
+  }
+
+  // ── Cabeçalho compacto para pág 2, 3... (com triângulo) ──
+  function drawPageHeader(yPos, logoDataArg){
+    var hH=16;
+    // Fundo
+    setF([240,246,255]); doc.rect(mL,yPos,cW,hH,'F');
+    setF([228,238,252]); doc.rect(mL,yPos+hH*0.5,cW,hH*0.5,'F');
+    // Triângulo no canto sup direito
+    drawTrianguloNoHeader(yPos, hH);
+    // Linha inferior
+    setD(navy2); doc.setLineWidth(0.5); doc.line(mL,yPos+hH,mL+cW,yPos+hH);
+    // Logo
+    if(logoDataArg&&logoDataArg.length>500){
+      try{ doc.addImage(logoDataArg,'PNG',mL+1,yPos+1,14,14); }catch(ex){}
+    }
+    // Textos
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); setC(navy);
+    doc.text('J. C. G. DA COSTA - EPP', mL+17, yPos+7);
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); setC(navy2);
+    doc.text('IRMÃOS COSTA e-LICITAÇÕES  |  CNPJ: '+EMPRESA.cnpj, mL+17, yPos+13);
+    return yPos+hH+2;
+  }
 
   // ═══════════════════════════════════════════════════
   // CABEÇALHO COM LOGO + NOME EMPRESA
   // ═══════════════════════════════════════════════════
   var headerH=34;
-  // Fundo do cabeçalho — gradiente simulado (3 faixas)
+  // Fundo do cabeçalho — duas faixas suaves
   setF([240,246,255]); doc.rect(mL,y,cW,headerH,'F');
-  setF([232,240,252]); doc.rect(mL,y+headerH*0.55,cW,headerH*0.45,'F');
+  setF([228,238,252]); doc.rect(mL,y+headerH*0.55,cW,headerH*0.45,'F');
   // Linha inferior do cabeçalho
   setD(navy2); doc.setLineWidth(0.5); doc.line(mL,y+headerH,mL+cW,y+headerH);
-  // Faixa decorativa direita
-  setF([210,228,248]); doc.rect(mL+cW-32,y,32,headerH,'F');
-  setD([180,205,230]); doc.setLineWidth(0.3);
-  doc.line(mL+cW-36,y,mL+cW-32,y+headerH);
+  // Triângulo decorativo no canto superior direito DO cabeçalho
+  drawTrianguloNoHeader(y, headerH);
 
   // Logo — sem caixa branca, direto no fundo do cabeçalho
   var logoBoxW=42, logoBoxH=30, logoBoxX=mL+3, logoBoxY=y+2;
@@ -1471,9 +1484,8 @@ async function generatePDF(){
     var itm=items[i];
     grandTotal+=itm.total;
 
-    // Calcular altura EXATA da linha — zero espaço desperdiçado
-    // Largura disponível para texto da descrição
-    var descW=col.desc-3;
+    // Largura disponível para texto — margem de 2mm de cada lado
+    var descW=col.desc-4; // col.desc menos 2mm esq + 2mm dir
     var nomeLines=itm.nome?doc.splitTextToSize(itm.nome.toUpperCase(),descW):[];
     var obsText=(itm.desc||itm.obs||'').trim();
     var obsLines=obsText?doc.splitTextToSize(obsText,descW):[];
@@ -1504,8 +1516,8 @@ async function generatePDF(){
     doc.setFont('helvetica','bold'); doc.setFontSize(9); setC(navy);
     doc.text(String(itm.num).padStart(2,'0'),mL+col.item/2,y+rowH/2+1.5,{align:'center'});
 
-    // Renderização da descrição — dy exato, linha a linha sem espaço extra
-    var dx=mL+col.item+1.5;
+    // Renderização da descrição — dx com margem de 2mm da borda esquerda da coluna
+    var dx=mL+col.item+2;
     // Nome: começa em y + padTop + baseline da fonte (lhNome)
     var dyNome=y+padTop+lhNome;
     if(nomeLines.length>0){

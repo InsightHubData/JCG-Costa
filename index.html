@@ -1244,26 +1244,47 @@ async function generatePDF(){
   // ═══════════════════════════════════════════════════
   // BORDA AZUL NA PÁGINA INTEIRA (1.5mm nas laterais)
   // ═══════════════════════════════════════════════════
-  function drawPageBorder(){
-    // Apenas o triângulo decorativo da quina superior direita do cabeçalho
-    // Igual à imagem: degradê de triângulos navy/azul sobre o fundo do header
-    // Nada mais — sem linhas, sem bordas, sem rodapé
-    var hH=36; // altura do cabeçalho
-    var cut=32; // tamanho do triângulo
-    // Triângulo de fundo (navy escuro)
-    setF(navy);
-    doc.triangle(W-mL-cut, mT, W-mL, mT, W-mL, mT+cut, 'F');
-    // Triângulo médio (navy2 azul)
-    setF(navy2);
-    doc.triangle(W-mL-cut+6, mT, W-mL, mT, W-mL, mT+cut-6, 'F');
-    // Triângulo frontal (ciano claro — igual ao da imagem)
-    setF([130,195,230]);
-    doc.triangle(W-mL-cut+13, mT, W-mL, mT, W-mL, mT+cut-13, 'F');
-    // Highlight branco suave no topo do triângulo
-    setF([180,220,245]);
-    doc.triangle(W-mL-cut+18, mT, W-mL, mT, W-mL, mT+cut-18, 'F');
+  // Triângulo decorativo — apenas na página 1, canto superior direito
+  function drawTrianguloQuina(yTopo){
+    var cut=32;
+    setF(navy);       doc.triangle(W-mL-cut,yTopo,   W-mL,yTopo,   W-mL,yTopo+cut,   'F');
+    setF(navy2);      doc.triangle(W-mL-cut+6,yTopo,  W-mL,yTopo,   W-mL,yTopo+cut-6, 'F');
+    setF([130,195,230]); doc.triangle(W-mL-cut+13,yTopo, W-mL,yTopo, W-mL,yTopo+cut-13,'F');
+    setF([180,220,245]); doc.triangle(W-mL-cut+18,yTopo, W-mL,yTopo, W-mL,yTopo+cut-18,'F');
   }
-  drawPageBorder();
+  // Cabeçalho compacto para páginas 2, 3... (sem triângulo)
+  function drawPageHeader(yPos, logoDataArg){
+    var hH=14;
+    setF([240,246,255]); doc.rect(mL,yPos,cW,hH,'F');
+    setF([210,228,248]); doc.rect(mL+cW-18,yPos,18,hH,'F');
+    setD(navy2); doc.setLineWidth(0.4); doc.line(mL,yPos+hH,mL+cW,yPos+hH);
+    // Logo pequena
+    if(logoDataArg&&logoDataArg.length>500){
+      try{ doc.addImage(logoDataArg,'PNG',mL+2,yPos+1,12,12); }catch(ex){}
+    }
+    // Nome empresa
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); setC(navy);
+    doc.text('J. C. G. DA COSTA - EPP', mL+16, yPos+6);
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setC(navy2);
+    doc.text('IRMÃOS COSTA e-LICITAÇÕES  |  CNPJ: '+EMPRESA.cnpj, mL+16, yPos+11);
+    return yPos+hH+3;
+  }
+  // Capturar logoData uma vez para reutilizar
+  var _logoData='';
+  (function(){
+    var logoEls2=[document.getElementById('lnLogoImg'),document.getElementById('hdLogoImg')];
+    for(var li2=0;li2<logoEls2.length;li2++){
+      var le=logoEls2[li2]; if(!le||!le.complete||le.naturalWidth<10) continue;
+      try{
+        var lc=document.createElement('canvas');
+        lc.width=le.naturalWidth; lc.height=le.naturalHeight;
+        lc.getContext('2d').drawImage(le,0,0);
+        var ld=lc.toDataURL('image/png');
+        if(ld.length>500){ _logoData=ld; break; }
+      }catch(ex){}
+    }
+  })();
+  drawTrianguloQuina(mT);
 
   // ═══════════════════════════════════════════════════
   // CABEÇALHO COM LOGO + NOME EMPRESA
@@ -1450,18 +1471,24 @@ async function generatePDF(){
     var itm=items[i];
     grandTotal+=itm.total;
 
-    // Calcular altura da linha pelo conteúdo real — sem espaço extra
-    var nomeLines=itm.nome?doc.splitTextToSize(itm.nome.toUpperCase(),col.desc-4):[];
-    var obsLines=(itm.desc||itm.obs)?doc.splitTextToSize(itm.desc||itm.obs||'',col.desc-4):[];
-    // Cada linha de nome = 4.0mm, cada linha obs = 3.6mm, pad topo=3, base=2
-    var altNome=nomeLines.length*4.0;
-    var altObs=obsLines.length*3.6;
-    var gapNomeObs=(nomeLines.length>0&&obsLines.length>0)?1.5:0;
-    var rowH=Math.ceil(3+altNome+gapNomeObs+altObs+2);
-    if(itm.img&&rowH<20) rowH=20;
-    if(rowH<9) rowH=9;
+    // Calcular altura EXATA da linha — zero espaço desperdiçado
+    // Largura disponível para texto da descrição
+    var descW=col.desc-3;
+    var nomeLines=itm.nome?doc.splitTextToSize(itm.nome.toUpperCase(),descW):[];
+    var obsText=(itm.desc||itm.obs||'').trim();
+    var obsLines=obsText?doc.splitTextToSize(obsText,descW):[];
+    // Espaçamento de linha em mm para cada tamanho de fonte
+    var lhNome=3.5;  // fontSize 8pt
+    var lhObs=3.2;   // fontSize 7.5pt
+    var padTop=2.5, padBot=2.5, gap=1.0;
+    var altNome=nomeLines.length*lhNome;
+    var altObs=obsLines.length*lhObs;
+    var gapNomeObs=(nomeLines.length>0&&obsLines.length>0)?gap:0;
+    var rowH=padTop+altNome+gapNomeObs+altObs+padBot;
+    if(rowH<8) rowH=8;
+    if(itm.img&&rowH<18) rowH=18;
 
-    if(y+rowH>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
+    if(y+rowH>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
     var bg=i%2===0?white:[245,248,253];
     setF(bg); doc.rect(mL,y,cW,rowH,'F');
     // Apenas linhas horizontais — sem bordas laterais externas
@@ -1477,17 +1504,24 @@ async function generatePDF(){
     doc.setFont('helvetica','bold'); doc.setFontSize(9); setC(navy);
     doc.text(String(itm.num).padStart(2,'0'),mL+col.item/2,y+rowH/2+1.5,{align:'center'});
 
-    // Descrição: nome bold navy + obs padrão sem cor diferente
-    var dy=y+3+4; // topo(3) + primeira linha baseline(4)
+    // Renderização da descrição — dy exato, linha a linha sem espaço extra
     var dx=mL+col.item+1.5;
+    // Nome: começa em y + padTop + baseline da fonte (lhNome)
+    var dyNome=y+padTop+lhNome;
     if(nomeLines.length>0){
       doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
-      doc.text(nomeLines,dx,dy);
-      dy+=altNome+gapNomeObs;
+      // Renderizar linha a linha para controle total
+      for(var nl=0;nl<nomeLines.length;nl++){
+        doc.text(nomeLines[nl], dx, dyNome+nl*lhNome);
+      }
     }
+    // Obs: logo abaixo do nome sem gap excessivo
     if(obsLines.length>0){
+      var dyObs=y+padTop+altNome+gapNomeObs+lhObs;
       doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(text_);
-      doc.text(obsLines,dx,dy);
+      for(var ol=0;ol<obsLines.length;ol++){
+        doc.text(obsLines[ol], dx, dyObs+ol*lhObs);
+      }
     }
 
     // Colunas centrais (verticalmente centradas)
@@ -1517,14 +1551,14 @@ async function generatePDF(){
     y+=rowH;
 
     // Extensos — sem espaço em branco extra entre linha e extenso
-    if(y>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
+    if(y>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
     setF([248,252,248]); doc.rect(mL,y,cW,4,'F');
     setD([210,230,210]); doc.setLineWidth(0.15);
     doc.line(mL,y,mL+cW,y); doc.line(mL,y+4,mL+cW,y+4);
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
     doc.text('Valor Unitário: = = = >>>'+valorPorExtenso(itm.unit).toUpperCase(),mL+2,y+2.8);
     y+=4;
-    if(y>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
+    if(y>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
     setF([244,250,244]); doc.rect(mL,y,cW,4,'F');
     setD([210,230,210]); doc.setLineWidth(0.15);
     doc.line(mL,y,mL+cW,y); doc.line(mL,y+4,mL+cW,y+4);
@@ -1537,7 +1571,7 @@ async function generatePDF(){
   // ═══════════════════════════════════════════════════
   // VALOR GLOBAL — cor única navy
   // ═══════════════════════════════════════════════════
-  if(y+14>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
+  if(y+14>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
   var disc=parseFloat(document.getElementById('fDesc').value)||0;
   var grand=grandTotal*(1-disc/100);
   // Uma única cor navy — label esquerda, valor direita
@@ -1550,7 +1584,7 @@ async function generatePDF(){
   y+=8;
 
   // Linha extenso do valor global
-  if(y+5>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
+  if(y+5>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
   setF(accentBg); doc.rect(mL,y,cW,5.5,'F');
   setD(navy2); doc.setLineWidth(0.3);
   doc.line(mL,y,mL+cW,y); doc.line(mL,y+5.5,mL+cW,y+5.5);
@@ -1579,7 +1613,7 @@ async function generatePDF(){
   declaracoes.forEach(function(d2){ obsH+=doc.splitTextToSize(d2,cW-6).length*3.8+1.5; });
   obsH+=4; // padding fundo
 
-  if(y+obsH>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
+  if(y+obsH>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
   var obsY0=y;
   // Desenha a caixa com altura exata calculada
   setF(white); doc.rect(mL,obsY0,cW,obsH,'F');
@@ -1606,7 +1640,7 @@ async function generatePDF(){
   y=obsY0+obsH+7;
 
   // ── ASSINATURA ────────────────────────────────────────
-  if(y+24>H-18){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
+  if(y+24>H-18){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
   var cidade_data=EMPRESA.cidade+' - ('+EMPRESA.uf+')., '+dataFmt;
   doc.setFont('helvetica','italic'); doc.setFontSize(9); setC(textSm);
   doc.text(cidade_data, W/2, y, {align:'center'});

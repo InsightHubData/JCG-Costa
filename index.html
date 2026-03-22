@@ -1245,10 +1245,33 @@ async function generatePDF(){
   // BORDA AZUL NA PÁGINA INTEIRA (1.5mm nas laterais)
   // ═══════════════════════════════════════════════════
   function drawPageBorder(){
-    setD(navy2); doc.setLineWidth(1.2);
-    doc.rect(2,2,W-4,H-4,'S');
-    setD(cyan); doc.setLineWidth(0.4);
-    doc.rect(3.2,3.2,W-6.4,H-6.4,'S');
+    // Borda decorativa: corta quina superior direita
+    // Medidas do corte da quina
+    var cut=18;
+    // Linha do topo esquerda até antes da quina
+    setD(navy2); doc.setLineWidth(1.0);
+    // Topo: esquerda -> direita (menos o corte)
+    doc.line(4,4,W-4-cut,4);
+    // Diagonal da quina superior direita
+    doc.line(W-4-cut,4,W-4,4+cut);
+    // Lado direito: de baixo da quina até rodapé
+    doc.line(W-4,4+cut,W-4,H-4);
+    // Rodapé: direita -> esquerda
+    doc.line(W-4,H-4,4,H-4);
+    // Lado esquerdo: rodapé -> topo
+    doc.line(4,H-4,4,4);
+    // Linha interna ciano — mesma forma
+    setD(cyan); doc.setLineWidth(0.35);
+    doc.line(5.2,5.2,W-5.2-cut+1,5.2);
+    doc.line(W-5.2-cut+1,5.2,W-5.2,5.2+cut-1);
+    doc.line(W-5.2,5.2+cut-1,W-5.2,H-5.2);
+    doc.line(W-5.2,H-5.2,5.2,H-5.2);
+    doc.line(5.2,H-5.2,5.2,5.2);
+    // Pequeno triângulo de preenchimento na quina (decoração)
+    setF(navy2);
+    doc.triangle(W-4-cut,4, W-4,4, W-4,4+cut,'F');
+    setF(navy);
+    doc.triangle(W-5.5-cut+2,5.5, W-5.5,5.5, W-5.5,5.5+cut-2,'F');
   }
   drawPageBorder();
 
@@ -1257,7 +1280,7 @@ async function generatePDF(){
   // ═══════════════════════════════════════════════════
   var headerH=32;
   setF([248,251,255]); doc.rect(mL,y,cW,headerH,'F');
-  setD(navy); doc.setLineWidth(0.4); doc.rect(mL,y,cW,headerH,'S');
+  setD(grayBd); doc.setLineWidth(0.3); doc.rect(mL,y,cW,headerH,'S');
   // Faixa azul esquerda
   setF(navy); doc.rect(mL,y,2,headerH,'F');
   // Faixa diagonal decorativa direita
@@ -1270,24 +1293,57 @@ async function generatePDF(){
   setF(white); doc.roundedRect(logoBoxX,logoBoxY,logoBoxW,logoBoxH,2,2,'F');
   setD([200,215,235]); doc.setLineWidth(0.3); doc.roundedRect(logoBoxX,logoBoxY,logoBoxW,logoBoxH,2,2,'S');
 
-  // Tentar inserir imagem da logo
-  var logoEl=document.getElementById('lnLogoImg')||document.getElementById('hdLogoImg');
-  if(logoEl&&logoEl.complete&&logoEl.naturalWidth>0&&logoEl.src&&!logoEl.src.endsWith('logo.png')){
+  // Inserir logo da logo.png — tenta todos os elementos img disponíveis
+  var logoInserted=false;
+  var logoEls=[
+    document.getElementById('lnLogoImg'),
+    document.getElementById('hdLogoImg')
+  ];
+  for(var li=0;li<logoEls.length;li++){
+    var logoEl=logoEls[li];
+    if(!logoEl||!logoEl.complete||logoEl.naturalWidth<10) continue;
     try{
       var logoCanvas=document.createElement('canvas');
       logoCanvas.width=logoEl.naturalWidth; logoCanvas.height=logoEl.naturalHeight;
       var logoCtx=logoCanvas.getContext('2d'); logoCtx.drawImage(logoEl,0,0);
       var logoData=logoCanvas.toDataURL('image/png');
-      var lW=logoBoxW-4, lH=logoBoxH-4;
+      // checar se não é imagem em branco/quebrada
+      if(logoData.length<500) continue;
+      var lW=logoBoxW-6, lH=logoBoxH-6;
       var ar=logoEl.naturalWidth/logoEl.naturalHeight;
       if(ar>1){ lH=lW/ar; } else { lW=lH*ar; }
+      if(lW<2||lH<2) continue;
       doc.addImage(logoData,'PNG',logoBoxX+(logoBoxW-lW)/2,logoBoxY+(logoBoxH-lH)/2,lW,lH);
-    }catch(ex){
-      // fallback texto JCG
-      doc.setFont('helvetica','bold'); doc.setFontSize(18); setC(navy);
-      doc.text('JCG',logoBoxX+logoBoxW/2,logoBoxY+logoBoxH/2+2,{align:'center'});
-    }
-  } else {
+      logoInserted=true;
+      break;
+    }catch(ex){ continue; }
+  }
+  // Se não conseguiu pelos elementos, tenta carregar logo.png via Image()
+  if(!logoInserted){
+    try{
+      var tmpImg=new Image();
+      tmpImg.crossOrigin='anonymous';
+      // usar data-uri se disponível no elemento, senão tentar logo.png relativo
+      var srcTry=document.getElementById('lnLogoImg')
+                 ?document.getElementById('lnLogoImg').src:'logo.png';
+      // sincrono via canvas (já carregada pelo browser)
+      var c2=document.createElement('canvas');
+      var tmpEl=document.getElementById('lnLogoImg')||document.getElementById('hdLogoImg');
+      if(tmpEl&&tmpEl.src&&tmpEl.src.length>100){
+        c2.width=tmpEl.naturalWidth||200; c2.height=tmpEl.naturalHeight||100;
+        var ctx2=c2.getContext('2d'); ctx2.drawImage(tmpEl,0,0);
+        var d2=c2.toDataURL('image/png');
+        if(d2.length>500){
+          var lW2=logoBoxW-6, lH2=logoBoxH-6;
+          var ar2=(tmpEl.naturalWidth||2)/(tmpEl.naturalHeight||1);
+          if(ar2>1){ lH2=lW2/ar2; } else { lW2=lH2*ar2; }
+          doc.addImage(d2,'PNG',logoBoxX+(logoBoxW-lW2)/2,logoBoxY+(logoBoxH-lH2)/2,lW2,lH2);
+          logoInserted=true;
+        }
+      }
+    }catch(ex2){}
+  }
+  if(!logoInserted){
     doc.setFont('helvetica','bold'); doc.setFontSize(14); setC(navy);
     doc.text('JCG',logoBoxX+logoBoxW/2,logoBoxY+logoBoxH/2+1,{align:'center'});
     doc.setFont('helvetica','normal'); doc.setFontSize(6); setC(navy2);
@@ -1383,9 +1439,9 @@ async function generatePDF(){
   var imgCol=16;
   col.desc=cW-col.item-col.marca-col.fabric-col.un-col.qtd-col.unit-col.total-imgCol;
 
-  // Header da tabela
+  // Header da tabela — sem bordas laterais
   setF(navy); doc.rect(mL,y,cW,7,'F');
-  setF(navy2); doc.rect(mL,y,2,7,'F');
+  setF(navy2); doc.rect(mL,y,3,7,'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(7); setC(white);
   var hx=mL;
   [['ITEM',col.item],['DESCRIÇÃO DETALHADA',col.desc],['MARCA',col.marca],['FABRICANTE',col.fabric],
@@ -1402,18 +1458,24 @@ async function generatePDF(){
     var itm=items[i];
     grandTotal+=itm.total;
 
-    // Calcular linhas de descrição
-    var nomeLines=itm.nome?doc.splitTextToSize(itm.nome.toUpperCase(),col.desc-3):[];
-    var obsLines=(itm.desc||itm.obs)?doc.splitTextToSize(itm.desc||itm.obs||'',col.desc-3):[];
-    // Altura: nome + obs + padding pequeno (não excessivo)
-    var textBlockH=(nomeLines.length*4.5)+(obsLines.length>0?obsLines.length*4+2:0)+6;
-    var minH=itm.img?Math.max(textBlockH,22):Math.max(textBlockH,11);
-    var rowH=minH;
+    // Calcular linhas de descrição — altura exata sem espaço desnecessário
+    var nomeLines=itm.nome?doc.splitTextToSize(itm.nome.toUpperCase(),col.desc-4):[];
+    var obsLines=(itm.desc||itm.obs)?doc.splitTextToSize(itm.desc||itm.obs||'',col.desc-4):[];
+    // Altura = topo(3) + nome(4.2/linha) + gap(1) + obs(3.8/linha) + fundo(3)
+    var textBlockH=3;
+    if(nomeLines.length>0) textBlockH+=nomeLines.length*4.2+1;
+    if(obsLines.length>0)  textBlockH+=obsLines.length*3.8;
+    textBlockH+=3; // margem fundo
+    // Se tem foto, garante espaço mínimo para ela
+    var rowH=itm.img?Math.max(textBlockH,20):Math.max(textBlockH,10);
 
     if(y+rowH>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
     var bg=i%2===0?white:[245,248,253];
     setF(bg); doc.rect(mL,y,cW,rowH,'F');
-    setD(grayBd); doc.rect(mL,y,cW,rowH,'S');
+    // Apenas linhas horizontais — sem bordas laterais externas
+    setD(grayBd); doc.setLineWidth(0.2);
+    doc.line(mL,y,mL+cW,y);         // topo
+    doc.line(mL,y+rowH,mL+cW,y+rowH); // base
     // Linhas verticais
     var vx=mL+col.item;
     [col.desc,col.marca,col.fabric,col.un,col.qtd,col.unit,col.total].forEach(function(w){ doc.line(vx,y,vx,y+rowH); vx+=w; });
@@ -1423,18 +1485,17 @@ async function generatePDF(){
     doc.setFont('helvetica','bold'); doc.setFontSize(9); setC(navy);
     doc.text(String(itm.num).padStart(2,'0'),mL+col.item/2,y+rowH/2+1.5,{align:'center'});
 
-    // Descrição: nome bold em cima + obs menor em baixo, pequena margem no final
-    var dy=y+4.5;
+    // Descrição: nome bold em cima + obs menor em baixo — sem espaço extra
+    var dy=y+4;
     var dx=mL+col.item+1.5;
     if(nomeLines.length>0){
       doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(text_);
       doc.text(nomeLines,dx,dy);
-      dy+=nomeLines.length*4.5+1;
+      dy+=nomeLines.length*4.2+1;
     }
     if(obsLines.length>0){
       doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
       doc.text(obsLines,dx,dy);
-      // dy += obsLines.length*4; // espaço final controlado pelo rowH
     }
 
     // Colunas centrais (verticalmente centradas)
@@ -1467,13 +1528,15 @@ async function generatePDF(){
     // Extensos — sem espaço em branco extra entre linha e extenso
     if(y>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
     setF([248,252,248]); doc.rect(mL,y,cW,4,'F');
-    setD([210,230,210]); doc.rect(mL,y,cW,4,'S');
+    setD([210,230,210]); doc.setLineWidth(0.15);
+    doc.line(mL,y,mL+cW,y); doc.line(mL,y+4,mL+cW,y+4);
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
     doc.text('Valor Unitário: = = = >>>'+valorPorExtenso(itm.unit).toUpperCase(),mL+2,y+2.8);
     y+=4;
     if(y>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
     setF([244,250,244]); doc.rect(mL,y,cW,4,'F');
-    setD([210,230,210]); doc.rect(mL,y,cW,4,'S');
+    setD([210,230,210]); doc.setLineWidth(0.15);
+    doc.line(mL,y,mL+cW,y); doc.line(mL,y+4,mL+cW,y+4);
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
     doc.text('Valor Total: = = = >>>'+valorPorExtenso(itm.total).toUpperCase(),mL+2,y+2.8);
     y+=4.5;
@@ -1488,7 +1551,7 @@ async function generatePDF(){
   var grand=grandTotal*(1-disc/100);
   // Uma única cor navy — label esquerda, valor direita
   setF(navy); doc.rect(mL,y,cW,8,'F');
-  setF(navy2); doc.rect(mL,y,2,8,'F'); // faixa esquerda
+  setF(navy2); doc.rect(mL,y,3,8,'F'); // faixa esquerda
   doc.setFont('helvetica','bold'); doc.setFontSize(10); setC(white);
   doc.text('VALOR GLOBAL = = = = = >', mL+5, y+5.5);
   doc.setFont('helvetica','bold'); doc.setFontSize(11); setC([200,235,255]);
@@ -1498,7 +1561,8 @@ async function generatePDF(){
   // Linha extenso do valor global
   if(y+5>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=mT+8; drawPageBorder(); }
   setF(accentBg); doc.rect(mL,y,cW,5.5,'F');
-  setD(navy2); doc.setLineWidth(0.3); doc.rect(mL,y,cW,5.5,'S');
+  setD(navy2); doc.setLineWidth(0.3);
+  doc.line(mL,y,mL+cW,y); doc.line(mL,y+5.5,mL+cW,y+5.5);
   doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
   doc.text('VALOR GLOBAL : = = = = = >   '+valorPorExtenso(grand).toUpperCase(), mL+2, y+3.8);
   y+=8;
@@ -1528,8 +1592,11 @@ async function generatePDF(){
   var obsY0=y;
   // Desenha a caixa com altura exata calculada
   setF(white); doc.rect(mL,obsY0,cW,obsH,'F');
-  setD(navy2); doc.setLineWidth(0.4); doc.rect(mL,obsY0,cW,obsH,'S');
-  setF(navy2); doc.rect(mL,obsY0,2,obsH,'F'); // faixa esquerda
+  setD(navy2); doc.setLineWidth(0.4);
+  // Bordas topo e base; lateral esq decorativa; sem lateral direita
+  doc.line(mL,obsY0,mL+cW,obsY0);
+  doc.line(mL,obsY0+obsH,mL+cW,obsY0+obsH);
+  setF(navy2); doc.rect(mL,obsY0,3,obsH,'F'); // faixa esquerda decorativa
 
   y=obsY0+5;
   doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(textSm);
@@ -1582,15 +1649,29 @@ async function generatePDF(){
 
 function addPdfFooterJCG(doc,W,H,mL,mR){
   var pages=doc.internal.getNumberOfPages();
+  var cut=18;
   for(var i=1;i<=pages;i++){
     doc.setPage(i);
-    // Borda azul em todas as páginas
-    doc.setDrawColor(29,95,166); doc.setLineWidth(1.2);
-    doc.rect(2,2,W-4,H-4,'S');
-    doc.setDrawColor(0,168,224); doc.setLineWidth(0.4);
-    doc.rect(3.2,3.2,W-6.4,H-6.4,'S');
+    // Redesenhar borda com quina cortada em todas as páginas
+    doc.setDrawColor(29,95,166); doc.setLineWidth(1.0);
+    doc.line(4,4,W-4-cut,4);
+    doc.line(W-4-cut,4,W-4,4+cut);
+    doc.line(W-4,4+cut,W-4,H-4);
+    doc.line(W-4,H-4,4,H-4);
+    doc.line(4,H-4,4,4);
+    doc.setDrawColor(0,168,224); doc.setLineWidth(0.35);
+    doc.line(5.2,5.2,W-5.2-cut+1,5.2);
+    doc.line(W-5.2-cut+1,5.2,W-5.2,5.2+cut-1);
+    doc.line(W-5.2,5.2+cut-1,W-5.2,H-5.2);
+    doc.line(W-5.2,H-5.2,5.2,H-5.2);
+    doc.line(5.2,H-5.2,5.2,5.2);
+    // Triângulo decorativo da quina
+    doc.setFillColor(29,95,166);
+    doc.triangle(W-4-cut,4, W-4,4, W-4,4+cut,'F');
+    doc.setFillColor(13,43,94);
+    doc.triangle(W-5.5-cut+2,5.5, W-5.5,5.5, W-5.5,5.5+cut-2,'F');
     // Rodapé
-    doc.setFillColor(13,43,94); doc.rect(4,H-10,W-8,8,'F');
+    doc.setFillColor(13,43,94); doc.rect(6,H-10,W-12,8,'F');
     doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(200,220,240);
     doc.text(EMPRESA.razaoSocial+' | CNPJ: '+EMPRESA.cnpj+' | '+EMPRESA.cidade+' – '+EMPRESA.uf, mL+2, H-5);
     doc.text('Pág. '+i+' de '+pages, W-mR-2, H-5, {align:'right'});

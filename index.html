@@ -1496,24 +1496,12 @@ async function generatePDF(){
     // Largura disponível para texto — margem de 2mm de cada lado
     var descW=col.desc-4; // col.desc menos 2mm esq + 2mm dir
     var nomeLines=itm.nome?doc.splitTextToSize(itm.nome.toUpperCase(),descW):[];
-    // Normalizar texto da descrição: corrigir OCR, reunir palavras quebradas
+    // Limpar texto da descrição — remover espaços duplos e normalizar
     var obsRaw=(itm.desc||itm.obs||'').trim();
-    // 1. Corrigir espaços dentro de palavras com acentos (OCR: "ADIÇ ÃO" → "ADIÇÃO")
-    obsRaw=obsRaw.replace(/([A-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇÜ])\s([ÃÕÂÊÎÔÛÁÉÍÓÚÀÇÜ])/g,'$1$2');
-    // 2. Reunir linhas quebradas no meio da frase (linha que não termina com ponto/vírgula)
-    //    Substitui 
- entre palavras por espaço — mantém 
- após pontuação
-    obsRaw=obsRaw.replace(/([^.;:
-])
-([a-záéíóúàâêîôûãõçüA-ZÁÉÍÓÚÀÂÊÎÔÛÃÕÇÜ0-9])/g,'$1 $2');
-    // 3. Remover quebras de linha múltiplas (mais de 1 linha em branco)
-    obsRaw=obsRaw.replace(/
-{3,}/g,'
-
-');
-    // 4. Remover espaços duplicados
-    obsRaw=obsRaw.replace(/  +/g,' ').trim();
+    // Substituir quebras de linha por espaço (texto contínuo)
+    obsRaw=obsRaw.split('\n').map(function(ln){ return ln.trim(); }).filter(function(ln){ return ln.length>0; }).join(' ');
+    // Remover espaços duplos
+    while(obsRaw.indexOf('  ')>=0){ obsRaw=obsRaw.replace(/  +/g,' '); }
     var obsText=obsRaw;
     var obsLines=obsText?doc.splitTextToSize(obsText,descW):[];
     // Espaçamento de linha em mm para cada tamanho de fonte

@@ -495,7 +495,9 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
               <th style="width:52px">Unid.</th>
               <th style="width:64px">Qtde</th>
               <th style="width:96px">Vl. Unitário R$</th>
-              <th style="width:96px;text-align:right;padding-right:8px">Vl. Total R$</th>
+              <th style="width:72px;text-align:right;padding-right:4px">Vl. Total R$</th>
+              <th style="width:70px;background:#1a5c2a;text-align:center">Margem %</th>
+              <th style="width:100px;background:#1a5c2a;text-align:right;padding-right:8px">Vl. c/ Margem R$</th>
               <th style="width:64px">Imagem</th>
               <th style="width:28px"></th>
             </tr></thead>
@@ -504,7 +506,11 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
         </div>
         <button class="btn-add-item" onclick="addItemRow()">➕ Adicionar Item</button>
         <div class="totals-row">
-          <div class="total-chip"><div class="tc-lbl">Subtotal</div><div class="tc-val" id="subtotal">R$ 0,00</div></div>
+          <div class="total-chip"><div class="tc-lbl">Subtotal Bruto</div><div class="tc-val" id="subtotal">R$ 0,00</div></div>
+          <div class="total-chip" style="border-color:#b8dacc">
+            <div class="tc-lbl" style="color:#1a5c2a">Total c/ Margem (bruto)</div>
+            <div class="tc-val" id="totalComMargem" style="color:#1a6b3a">R$ 0,00</div>
+          </div>
           <div class="total-chip">
             <div class="tc-lbl">Desconto %</div>
             <div style="display:flex;gap:6px;align-items:center">
@@ -514,7 +520,11 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
               <span style="font-size:13px;color:var(--text-sm)">%</span>
             </div>
           </div>
-          <div class="total-chip grand"><div class="tc-lbl">Total Geral</div><div class="tc-val" id="grandTotal">R$ 0,00</div></div>
+          <div class="total-chip grand"><div class="tc-lbl">Total Geral (sem margem)</div><div class="tc-val" id="grandTotal">R$ 0,00</div></div>
+          <div class="total-chip grand" style="background:linear-gradient(135deg,#e8f5ee,#d4edda);border-color:#b8dacc">
+            <div class="tc-lbl" style="color:#1a5c2a">Total c/ Margem (final)</div>
+            <div class="tc-val" id="grandTotalMargem" style="color:#1a6b3a;font-size:26px">R$ 0,00</div>
+          </div>
         </div>
       </div>
 
@@ -1095,7 +1105,18 @@ function addItemRow(data){
     '<td><input type="text" id="iun-'+id+'" value="'+(row.un||'UN')+'" style="width:100%"></td>'+
     '<td><input type="number" id="iqty-'+id+'" value="'+(row.qty||1)+'" min="0" step="any" oninput="recalcRow('+id+')" onchange="recalcRow('+id+')" style="width:100%"></td>'+
     '<td><input type="number" id="iunit-'+id+'" value="'+(row.unit||'')+'" min="0" step="0.01" placeholder="0,00" oninput="recalcRow('+id+')" onchange="recalcRow('+id+')" style="width:100%"></td>'+
-    '<td id="itot-'+id+'" style="font-weight:700;color:var(--navy);text-align:right;padding-right:8px">R$ 0,00</td>'+
+    '<td id="itot-'+id+'" style="font-weight:700;color:var(--navy);text-align:right;padding-right:6px;font-size:11px">R$ 0,00</td>'+
+    '<td style="text-align:center;padding:4px 3px">'+
+      '<select id="imarg-'+id+'" onchange="recalcRow('+id+')" style="width:100%;padding:4px 2px;border:1.5px solid #b8dacc;border-radius:5px;font-size:12px;font-weight:700;color:#1a5c2a;background:#f0faf4;text-align:center">'+
+        '<option value="0">—</option>'+
+        '<option value="30">30%</option>'+
+        '<option value="35">35%</option>'+
+        '<option value="40">40%</option>'+
+        '<option value="45">45%</option>'+
+        '<option value="50">50%</option>'+
+      '</select>'+
+    '</td>'+
+    '<td id="itotmarg-'+id+'" style="font-weight:700;color:#1a6b3a;text-align:right;padding-right:8px;background:#f0faf4">R$ 0,00</td>'+
     '<td>'+
       '<div style="display:flex;flex-direction:column;gap:3px;align-items:center">'+
         '<img class="img-preview" id="iimg-'+id+'" alt="">'+
@@ -1107,6 +1128,11 @@ function addItemRow(data){
     '<td><button class="btn-del" onclick="removeRow('+id+')">✕</button></td>';
   tbody.appendChild(tr);
   if(row.img){ itemImages[id]=row.img; showImgPreview(id,row.img); }
+  // Restaurar margem salva no histórico
+  if(row.marg){
+    var ms=document.getElementById('imarg-'+id);
+    if(ms){ ms.value=String(row.marg); }
+  }
   recalcRow(id); recalcTotals();
 }
 
@@ -1120,6 +1146,9 @@ function fillItemFromProd(rowId, prod){
   if(f('iun-'+rowId))    f('iun-'+rowId).value    = prod.un||'UN';
   if(f('iunit-'+rowId))  f('iunit-'+rowId).value  = prod.preco||'';
   if(prod.img){ itemImages[rowId]=prod.img; showImgPreview(rowId,prod.img); }
+  // Restaurar margem se vier do produto
+  var margSel=document.getElementById('imarg-'+rowId);
+  if(margSel&&prod.marg){ margSel.value=String(prod.marg); }
   recalcRow(rowId); recalcTotals();
   ['icod-list-'+rowId,'inome-list-'+rowId].forEach(function(lid){ var el=document.getElementById(lid); if(el) el.style.display='none'; });
 }
@@ -1165,21 +1194,42 @@ function removeRow(id){ var tr=document.getElementById('irow-'+id); if(tr) tr.re
 function recalcRow(id){
   var qty=parseFloat((document.getElementById('iqty-'+id)||{}).value||0)||0;
   var unit=parseFloat((document.getElementById('iunit-'+id)||{}).value||0)||0;
+  var marg=parseFloat((document.getElementById('imarg-'+id)||{}).value||0)||0;
+  var total=qty*unit;
+  var unitComMarg=marg>0?unit*(1+marg/100):unit;
+  var totalComMarg=qty*unitComMarg;
   var cell=document.getElementById('itot-'+id);
-  if(cell) cell.textContent=fBRL(qty*unit);
+  if(cell) cell.textContent=fBRL(total);
+  var cellM=document.getElementById('itotmarg-'+id);
+  if(cellM){
+    if(marg>0){
+      cellM.textContent=fBRL(totalComMarg);
+      cellM.style.background='#e8f5ee';
+    } else {
+      cellM.textContent='—';
+      cellM.style.background='#f8f8f8';
+    }
+  }
   recalcTotals();
 }
 function recalcTotals(){
-  var sub=0;
+  var sub=0, subMarg=0;
   document.querySelectorAll('#itemsBody tr').forEach(function(tr){
     var id=tr.id.replace('irow-','');
     var qty=parseFloat((document.getElementById('iqty-'+id)||{}).value||0)||0;
     var unit=parseFloat((document.getElementById('iunit-'+id)||{}).value||0)||0;
-    sub+=qty*unit;
+    var marg=parseFloat((document.getElementById('imarg-'+id)||{}).value||0)||0;
+    var total=qty*unit;
+    sub+=total;
+    subMarg+=marg>0?qty*unit*(1+marg/100):total;
   });
   var disc=parseFloat(document.getElementById('fDesc').value)||0;
   document.getElementById('subtotal').textContent=fBRL(sub);
   document.getElementById('grandTotal').textContent=fBRL(sub*(1-disc/100));
+  var tcm=document.getElementById('totalComMargem');
+  if(tcm) tcm.textContent=fBRL(subMarg);
+  var gtm=document.getElementById('grandTotalMargem');
+  if(gtm) gtm.textContent=fBRL(subMarg*(1-disc/100));
 }
 
 function fBRL(n){ return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
@@ -1191,9 +1241,12 @@ function getItems(){
     var id=tr.id.replace('irow-','');
     var g=function(sid){ return (document.getElementById(sid+id)||{}).value||''; };
     var qty=parseFloat(g('iqty-'))||0, unit=parseFloat(g('iunit-'))||0;
+    var marg=parseFloat((document.getElementById('imarg-'+id)||{}).value||0)||0;
+    var unitFinal=marg>0?unit*(1+marg/100):unit;
     items.push({ num:i+1, cod:g('icod-'), nome:g('inome-'), desc:g('iobs-'), obs:g('iobs-'),
       marca:g('imarca-'), fabricante:g('ifabric-'), un:g('iun-')||'UN',
-      qty:qty, unit:unit, total:qty*unit, img:itemImages[id]||null });
+      qty:qty, unit:unit, unitFinal:unitFinal, marg:marg,
+      total:qty*unit, totalFinal:qty*unitFinal, img:itemImages[id]||null });
   });
   return items;
 }
@@ -1497,7 +1550,7 @@ async function generatePDF(){
   var grandTotal=0;
   for(var i=0;i<items.length;i++){
     var itm=items[i];
-    grandTotal+=itm.total;
+    grandTotal+=(itm.marg>0?itm.totalFinal:itm.total);
 
     // Largura disponível — 2mm margem cada lado
     var descW=col.desc-4;
@@ -1563,11 +1616,13 @@ async function generatePDF(){
     doc.text(doc.splitTextToSize(itm.fabricante||'',col.fabric-2)[0]||'',cx2+col.fabric/2,midY,{align:'center'}); cx2+=col.fabric;
     doc.text(itm.un||'UN',cx2+col.un/2,midY,{align:'center'}); cx2+=col.un;
     doc.text(String(itm.qty),cx2+col.qtd/2,midY,{align:'center'}); cx2+=col.qtd;
-    // Valor unitário — padrão
-    doc.text(fBRLn(itm.unit),cx2+col.unit/2,midY,{align:'center'}); cx2+=col.unit;
+    // Valor unitário — com margem se definida
+    var pdfUnit=itm.marg>0?itm.unitFinal:itm.unit;
+    var pdfTotal=itm.marg>0?itm.totalFinal:itm.total;
+    doc.text(fBRLn(pdfUnit),cx2+col.unit/2,midY,{align:'center'}); cx2+=col.unit;
     // Valor total — bold navy (destaque)
     doc.setFont('helvetica','bold'); setC(navy);
-    doc.text(fBRLn(itm.total),cx2+col.total/2,midY,{align:'center'}); cx2+=col.total;
+    doc.text(fBRLn(pdfTotal),cx2+col.total/2,midY,{align:'center'}); cx2+=col.total;
 
     // Foto na coluna dedicada
     if(itm.img){
@@ -1586,14 +1641,14 @@ async function generatePDF(){
     setD([210,230,210]); doc.setLineWidth(0.15);
     doc.line(mL,y,mL+cW,y); doc.line(mL,y+4,mL+cW,y+4);
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
-    doc.text('Valor Unitário: = = = >>>'+valorPorExtenso(itm.unit).toUpperCase(),mL+2,y+2.8);
+    doc.text('Valor Unitário: = = = >>>'+valorPorExtenso(pdfUnit).toUpperCase(),mL+2,y+2.8);
     y+=4;
     if(y>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
     setF([244,250,244]); doc.rect(mL,y,cW,4,'F');
     setD([210,230,210]); doc.setLineWidth(0.15);
     doc.line(mL,y,mL+cW,y); doc.line(mL,y+4,mL+cW,y+4);
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
-    doc.text('Valor Total: = = = >>>'+valorPorExtenso(itm.total).toUpperCase(),mL+2,y+2.8);
+    doc.text('Valor Total: = = = >>>'+valorPorExtenso(pdfTotal).toUpperCase(),mL+2,y+2.8);
     y+=4.5;
   }
   y+=3;
@@ -2230,7 +2285,9 @@ function getPedData(){
     enderecoOrgao:g('pedEnderecoOrgao'), enderecoEntrega:g('pedEnderecoEntrega'),
     transportador:g('pedTransportador'), frete:g('pedFrete'),
     vendedor:g('pedVendedor'), tel:g('pedTel'), email:g('pedEmail'), obs:g('pedObs'),
-    desconto:disc, subtotal:sub, grand:sub*(1-disc/100), items:items };
+    desconto:disc, subtotal:sub, grand:sub*(1-disc/100),
+    grandFinal:items.reduce(function(a,i){ return a+(i.marg>0?i.totalFinal:i.total); },0)*(1-disc/100),
+    items:items };
 }
 
 function salvarPedido(){

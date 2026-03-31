@@ -322,8 +322,8 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
   window.fbDeleteCliente = async id=>{ try{ await deleteDoc(doc(db,'clientes',String(id))); }catch(e){} };
   window.fbSaveProduto   = async o=>{ try{ await setDoc(doc(db,'produtos',String(o.id)),o); }catch(e){} };
   window.fbDeleteProduto = async id=>{ try{ await deleteDoc(doc(db,'produtos',String(id))); }catch(e){} };
-  window.fbSaveProposta  = async o=>{ try{ await setDoc(doc(db,'propostas',String(o.id)),o); }catch(e){} };
-  window.fbSavePedido    = async o=>{ try{ await setDoc(doc(db,'pedidos',String(o.id)),o); }catch(e){} };
+  window.fbSaveProposta  = async o=>{ try{ await setDoc(doc(db,'propostas',String(o.id)),o); console.log('FB proposta salva:',o.num||o.id); }catch(e){ console.error('FB proposta erro:',e.message,o.id); } };
+  window.fbSavePedido    = async o=>{ try{ await setDoc(doc(db,'pedidos',String(o.id)),o); console.log('FB pedido salvo:',o.num||o.id); }catch(e){ console.error('FB pedido erro:',e.message,o.id); } };
   window.fbDeleteHist    = async (id,tipo)=>{ try{ await deleteDoc(doc(db,tipo==='pedido'?'pedidos':'propostas',String(id))); }catch(e){} };
 
   async function cleanOld(col){
@@ -995,16 +995,64 @@ try { history_  = JSON.parse(localStorage.getItem('sn_hist2')  || '[]'); } catch
 try { clients_  = JSON.parse(localStorage.getItem('sn_cli2')   || '[]'); } catch(e){ clients_=[]; }
 try { products_ = JSON.parse(localStorage.getItem('sn_prod2')  || '[]'); } catch(e){ products_=[]; }
 
+function comprimirBase64(base64, qualidade, cb){
+  // Comprime imagem base64 para JPEG reduzido antes de ir ao Firestore
+  if(!base64||base64.length<500){ cb(base64||''); return; }
+  try{
+    var img=new Image();
+    img.onload=function(){
+      var cv=document.createElement('canvas');
+      // Reduzir dimensão máxima para 200px mantendo proporção
+      var maxDim=200, w=img.width, h=img.height;
+      if(w>maxDim||h>maxDim){
+        if(w>h){ h=Math.round(h*maxDim/w); w=maxDim; }
+        else    { w=Math.round(w*maxDim/h); h=maxDim; }
+      }
+      cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      cb(cv.toDataURL('image/jpeg', qualidade||0.35));
+    };
+    img.onerror=function(){ cb(base64); };
+    img.src=base64;
+  }catch(e){ cb(base64); }
+}
+
+function fbSalvarHistItem(h){
+  if(!h||!h.id) return;
+  var hFb=JSON.parse(JSON.stringify(h));
+  // Se não tiver itens com imagem, salva direto
+  var temImg=(hFb.items||[]).some(function(it){ return it.img&&it.img.length>500; });
+  if(!temImg){
+    if(h.tipo==='pedido'){ if(typeof window.fbSavePedido==='function') window.fbSavePedido(hFb); }
+    else { if(typeof window.fbSaveProposta==='function') window.fbSaveProposta(hFb); }
+    return;
+  }
+  // Comprimir imagens dos itens antes de enviar
+  var itens=hFb.items||[];
+  var pendentes=itens.filter(function(it){ return it.img&&it.img.length>500; }).length;
+  if(pendentes===0){
+    if(h.tipo==='pedido'){ if(typeof window.fbSavePedido==='function') window.fbSavePedido(hFb); }
+    else { if(typeof window.fbSaveProposta==='function') window.fbSaveProposta(hFb); }
+    return;
+  }
+  itens.forEach(function(it, idx){
+    if(it.img&&it.img.length>500){
+      comprimirBase64(it.img, 0.35, function(imgComp){
+        hFb.items[idx].img=imgComp;
+        pendentes--;
+        if(pendentes===0){
+          if(h.tipo==='pedido'){ if(typeof window.fbSavePedido==='function') window.fbSavePedido(hFb); }
+          else { if(typeof window.fbSaveProposta==='function') window.fbSaveProposta(hFb); }
+        }
+      });
+    }
+  });
+}
+
 function saveLS(itemEspecifico){
   try{ localStorage.setItem('sn_hist2', JSON.stringify(history_)); } catch(e){}
-  // Se um item específico for passado, salva só ele no Firebase
-  // Caso contrário, salva todos (compatibilidade)
   var lista=itemEspecifico?[itemEspecifico]:history_;
-  lista.forEach(function(h){
-    if(!h||!h.id) return;
-    if(h.tipo==='pedido'){ if(typeof window.fbSavePedido==='function') window.fbSavePedido(h); }
-    else { if(typeof window.fbSaveProposta==='function') window.fbSaveProposta(h); }
-  });
+  lista.forEach(function(h){ fbSalvarHistItem(h); });
 }
 function saveLSCli(){
   try{ localStorage.setItem('sn_cli2', JSON.stringify(clients_)); } catch(e){}
@@ -1873,8 +1921,10 @@ function getFormData(){
   var items=getItems();
   var disc=parseFloat(document.getElementById('fDesc').value)||0;
   var sub=items.reduce(function(a,i){ return a+i.total; },0);
+  var propId=editingId||Date.now();
   return {
-    id: editingId||Date.now(),
+    id: propId,
+    tipo: 'proposta',
     num: document.getElementById('fNum').value,
     data: document.getElementById('fData').value,
     orgao: document.getElementById('fOrgao').value,
@@ -1896,6 +1946,7 @@ function getFormData(){
     desconto: disc,
     items: items,
     grand: sub*(1-disc/100),
+    grandFinal:items.reduce(function(a,i){ return a+(i.marg>0?i.totalFinal:i.total); },0)*(1-disc/100),
     status: 'Pendente',
     semana: weekKey(new Date())
   };
@@ -2420,7 +2471,7 @@ function salvarPedido(){
   if(hi>=0) history_[hi]=hEntry; else history_.unshift(hEntry);
   saveLS(hEntry); pedSeq_++; localStorage.setItem('jcg_ped_seq',pedSeq_);
   // Forçar save no Firebase diretamente também
-  if(typeof window.fbSavePedido==='function') window.fbSavePedido(hEntry);
+  fbSalvarHistItem(hEntry);
   toast('Pedido '+d.num+' salvo!','ok');
 }
 
@@ -2672,29 +2723,32 @@ function gerarPdfPedido(){
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
   doc.text(d.vendedor||'Sócio Administrador', xA+colA/2, y+32, {align:'center'});
 
-  // ── BLOCO DIREITO: Recebedor ──
+  // ── BLOCO DIREITO: Recebedor — igual à imagem
   setF([248,252,248]); doc.roundedRect(xB,y,colB,36,2,2,'F');
   setD([180,215,190]); doc.setLineWidth(0.3); doc.roundedRect(xB,y,colB,36,2,2,'S');
-  setF([26,140,80]); doc.rect(xB,y,3,36,'F'); // faixa esq verde
+  setF([26,140,80]); doc.rect(xB,y,3,36,'F'); // faixa lateral verde
 
   // Label topo
-  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); setC([40,120,70]);
-  doc.text('RECEBIDO POR', xB+6, y+4.5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); setC([26,140,80]);
+  doc.text('RECEBIDO POR', xB+6, y+5);
 
-  // Linha de assinatura
-  setD([150,200,160]); doc.setLineWidth(0.5);
-  doc.line(xB+6, y+18, xB+colB-6, y+18);
+  // APENAS a linha verde para assinar
+  setD([26,140,80]); doc.setLineWidth(0.8);
+  doc.line(xB+6, y+16, xB+colB-6, y+16);
 
-  // Campos abaixo da linha — sem linha duplicada de Nome
+  // Abaixo da linha: só Nome (sem segunda linha)
   doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
-  doc.text('Nome: ___________________________________', xB+6, y+23.5);
-  doc.text('CPF/CNPJ: _______________', xB+6, y+29);
-  doc.text('Data: ___/___/______', xB+colB*0.55, y+29);
+  doc.text('Nome: _______________________________', xB+6, y+22);
 
-  // Destinatário (nome do órgão pequeno)
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); setC(textSm);
+  // CPF/CNPJ e Data na mesma linha
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(text_);
+  doc.text('CPF/CNPJ: ________________', xB+6, y+27.5);
+  doc.text('Data: ___/___/______', xB+6, y+32);
+
+  // Nome do órgão bem pequeno no rodapé do bloco
+  doc.setFont('helvetica','normal'); doc.setFontSize(6.5); setC([40,120,70]);
   var orgShort=doc.splitTextToSize(d.orgao||'',colB-12)[0]||'';
-  doc.text(orgShort, xB+colB/2, y+34, {align:'center'});
+  doc.text(orgShort, xB+colB/2, y+35.5, {align:'center'});
 
   y+=36+8;
 
@@ -2707,7 +2761,7 @@ function gerarPdfPedido(){
   if(existePed<0){ salvarPedido(); } else {
     history_[existePed].grand=d.grand;
     saveLS(history_[existePed]);
-    if(typeof window.fbSavePedido==='function') window.fbSavePedido(history_[existePed]);
+    fbSalvarHistItem(history_[existePed]);
     renderHist();
   }
   toast('PDF do Pedido gerado!','ok');

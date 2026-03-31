@@ -193,8 +193,8 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
 
 /* Totais */
 .totals-row{display:flex;justify-content:flex-end;gap:16px;padding:14px 0 0;flex-wrap:wrap}
-.total-chip{background:var(--accent);border:1px solid var(--gray-bd);border-radius:8px;padding:10px 16px;text-align:right}
-.total-chip .tc-lbl{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-sm)}
+.total-chip{background:var(--accent);border:1px solid var(--gray-bd);border-radius:8px;padding:10px 16px;text-align:right;min-width:140px;flex:1;max-width:220px}
+.total-chip .tc-lbl{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .total-chip .tc-val{font-family:'Oswald',sans-serif;font-size:20px;font-weight:600;color:var(--navy)}
 .total-chip.grand .tc-val{color:var(--blue);font-size:24px}
 
@@ -520,11 +520,11 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
             </div>
           </div>
           <div class="total-chip grand">
-            <div class="tc-lbl" id="lblTotalOriginal">VALOR TOTAL ORIGINAL</div>
+            <div class="tc-lbl" id="lblTotalOriginal">VALOR ORIGINAL</div>
             <div class="tc-val" id="grandTotal">R$ 0,00</div>
           </div>
           <div class="total-chip grand" style="background:linear-gradient(135deg,#e8f5ee,#d4edda);border-color:#b8dacc">
-            <div class="tc-lbl" id="lblTotalMargem" style="color:#1a5c2a">VALOR TOTAL COM MARGEM</div>
+            <div class="tc-lbl" id="lblTotalMargem" style="color:#1a5c2a">VALOR C/ MARGEM</div>
             <div class="tc-val" id="grandTotalMargem" style="color:#1a6b3a;font-size:26px">R$ 0,00</div>
           </div>
         </div>
@@ -628,8 +628,12 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
 
         <div class="form-card">
           <h3>🚚 Transportador / Frete</h3>
-          <div class="field" style="margin-bottom:12px"><label>Local físico de entrega</label>
-            <input type="text" id="pedEnderecoEntrega" placeholder="Endereço físico de entrega"></div>
+          <div class="row2" style="margin-bottom:12px">
+            <div class="field"><label>Local físico de entrega</label>
+              <input type="text" id="pedEnderecoEntrega" placeholder="Endereço físico de entrega"></div>
+            <div class="field"><label>Cidade / UF</label>
+              <input type="text" id="pedCidadeUF" placeholder="Ex: Tabatinga / AM" oninput="sincCidadeUF()"></div>
+          </div>
           <div class="row2">
             <div class="field"><label>Transportador</label>
               <input type="text" id="pedTransportador" value="MOTORISTA PARTICULAR"></div>
@@ -680,11 +684,11 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
               </div>
             </div>
             <div class="total-chip grand">
-              <div class="tc-lbl" id="pedLblOriginal">VALOR TOTAL ORIGINAL</div>
+              <div class="tc-lbl" id="pedLblOriginal">VALOR ORIGINAL</div>
               <div class="tc-val" id="pedTotal">R$ 0,00</div>
             </div>
             <div class="total-chip grand" style="background:linear-gradient(135deg,#e8f5ee,#d4edda);border-color:#b8dacc">
-              <div class="tc-lbl" id="pedLblMargem" style="color:#1a5c2a">VALOR TOTAL COM MARGEM</div>
+              <div class="tc-lbl" id="pedLblMargem" style="color:#1a5c2a">VALOR C/ MARGEM</div>
               <div class="tc-val" id="pedTotalMargem" style="color:#1a6b3a;font-size:26px">R$ 0,00</div>
             </div>
           </div>
@@ -775,9 +779,13 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
               <div class="field"><label>Inscrição Estadual</label><input type="text" id="cadCliIE" placeholder="Ex: NÃO CONTRIBUINTE"></div>
             </div>
             <div class="field" style="margin-bottom:12px"><label>Endereço Completo</label>
-              <input type="text" id="cadCliEndereco" placeholder="Av. ... - CEP ... - Cidade / UF"></div>
-            <div class="field" style="margin-bottom:12px"><label>Local de Entrega (se diferente)</label>
-              <input type="text" id="cadCliCidade" placeholder="Endereço de entrega"></div>
+              <input type="text" id="cadCliEndereco" placeholder="Av. Santos Dumont, 143 – Comunicações"></div>
+            <div class="row2" style="margin-bottom:12px">
+              <div class="field"><label>Local de Entrega (se diferente)</label>
+                <input type="text" id="cadCliCidade" placeholder="Endereço físico de entrega"></div>
+              <div class="field"><label>Cidade / UF</label>
+                <input type="text" id="cadCliCidadeUF" placeholder="Ex: Tabatinga / AM"></div>
+            </div>
             <div class="field"><label>Responsável / Contato</label>
               <input type="text" id="cadCliResp" placeholder="Nome do responsável"></div>
             <button class="btn-primary" style="margin-top:14px;padding:10px 18px;font-size:13px" onclick="saveClient()">✅ Salvar Cliente</button>
@@ -902,7 +910,10 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
       <div class="field"><label>Inscrição Estadual</label><input type="text" id="editCliIE"></div>
     </div>
     <div class="field" style="margin-bottom:12px"><label>Endereço Completo</label><input type="text" id="editCliEndereco"></div>
-    <div class="field" style="margin-bottom:12px"><label>Local de Entrega</label><input type="text" id="editCliCidade"></div>
+    <div class="row2" style="margin-bottom:12px">
+      <div class="field"><label>Local de Entrega</label><input type="text" id="editCliCidade"></div>
+      <div class="field"><label>Cidade / UF</label><input type="text" id="editCliCidadeUF"></div>
+    </div>
     <div class="field" style="margin-bottom:18px"><label>Responsável / Contato</label><input type="text" id="editCliResp"></div>
     <div class="btn-row">
       <button class="btn-primary btn-green" onclick="saveEditClient()">💾 Salvar</button>
@@ -1087,6 +1098,7 @@ function acSearch(fieldId){
       document.getElementById('fCidadeOrgao').value=item.endereco||item.cidade||'';
       document.getElementById('fRespOrgao').value=item.resp||'';
       var fl=document.getElementById('fLocal'); if(fl) fl.value=item.cidade||item.endereco||'';
+      var flcuf=document.getElementById('pedCidadeUF'); if(flcuf) flcuf.value=item.cidadeUF||item.cidade||'';
       list.style.display='none';
     };
     list.appendChild(d);
@@ -1255,12 +1267,12 @@ function recalcTotals(){
   if(lblOrig) lblOrig.textContent='VALOR TOTAL ORIGINAL';
   if(lblMarg){
     if(margens.length===0){
-      lblMarg.textContent='VALOR TOTAL COM MARGEM';
+      lblMarg.textContent='VALOR C/ MARGEM';
     } else if(margens.length===1){
-      lblMarg.textContent='VALOR TOTAL COM '+margens[0]+'%';
+      lblMarg.textContent='VALOR C/ MARGEM '+margens[0]+'%';
     } else {
       margens.sort(function(a,b){return a-b;});
-      lblMarg.textContent='VALOR TOTAL COM MARGEM ('+margens.join('%, ')+'%)';
+      lblMarg.textContent='VALOR C/ MARGEM (misto)';
     }
   }
   // Compat hidden
@@ -1275,6 +1287,7 @@ function recalcTotals(){
 }
 
 function fBRL(n){ return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+function sincCidadeUF(){ /* campo livre — usuário digita direto */ }
 function fBRLn(n){ return n.toLocaleString('pt-BR',{minimumFractionDigits:2}); }
 
 function getItems(){
@@ -2017,10 +2030,11 @@ function saveClient(){
     ie:(document.getElementById('cadCliIE')||{}).value||'',
     endereco:(document.getElementById('cadCliEndereco')||{}).value||'',
     cidade:document.getElementById('cadCliCidade').value,
+    cidadeUF:(document.getElementById('cadCliCidadeUF')||{}).value||'',
     resp:document.getElementById('cadCliResp').value
   });
   saveLSCli(); renderCadLists();
-  ['cadCliNome','cadCliCnpj','cadCliCidade','cadCliResp'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['cadCliNome','cadCliCnpj','cadCliCidade','cadCliCidadeUF','cadCliResp'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   toast('Cliente salvo!','ok');
 }
 
@@ -2132,6 +2146,7 @@ function openEditClient(id){
   document.getElementById('editCliIE').value=c.ie||'';
   document.getElementById('editCliEndereco').value=c.endereco||'';
   document.getElementById('editCliCidade').value=c.cidade||'';
+  var ecuf=document.getElementById('editCliCidadeUF'); if(ecuf) ecuf.value=c.cidadeUF||'';
   document.getElementById('editCliResp').value=c.resp||'';
   document.getElementById('cliEditOv').classList.add('open');
 }
@@ -2142,7 +2157,9 @@ function saveEditClient(){
   var idx=clients_.findIndex(function(x){ return x.id===id; }); if(idx<0) return;
   clients_[idx]={ id:clients_[idx].id, nome:nome, cnpj:(document.getElementById('editCliCnpj').value||'').trim(),
     ie:(document.getElementById('editCliIE').value||'').trim(), endereco:(document.getElementById('editCliEndereco').value||'').trim(),
-    cidade:(document.getElementById('editCliCidade').value||'').trim(), resp:(document.getElementById('editCliResp').value||'').trim() };
+    cidade:(document.getElementById('editCliCidade').value||'').trim(),
+    cidadeUF:(document.getElementById('editCliCidadeUF').value||'').trim(),
+    resp:(document.getElementById('editCliResp').value||'').trim() };
   saveLSCli(); renderCadLists(); document.getElementById('cliEditOv').classList.remove('open'); toast('Cliente atualizado!','ok');
 }
 
@@ -2260,6 +2277,10 @@ function preencherPedForm(cot){
   document.getElementById('pedIEOrgao').value=cot.ieOrgao||(cliM?cliM.ie:'')||'';
   document.getElementById('pedEnderecoOrgao').value=cot.cidadeOrgao||'';
   var eeEl=document.getElementById('pedEnderecoEntrega'); if(eeEl) eeEl.value=cot.local||cot.cidadeOrgao||'';
+  // Buscar cidadeUF do cliente cadastrado
+  var cliRef=clients_.find(function(cl){ return cl.nome&&cot.orgao&&cl.nome.trim().toLowerCase()===cot.orgao.trim().toLowerCase(); });
+  var cufVal=(cliRef&&cliRef.cidadeUF)?cliRef.cidadeUF:(cot.cidadeUF||EMPRESA.cidade+' / '+EMPRESA.uf);
+  var cufEl=document.getElementById('pedCidadeUF'); if(cufEl) cufEl.value=cufVal;
   document.getElementById('pedVendedor').value=cot.vendedor||'';
   document.getElementById('pedTel').value=cot.tel||'';
   document.getElementById('pedEmail').value=cot.email||EMPRESA.email2;
@@ -2335,9 +2356,9 @@ function recalcPed(){
   var lp=g('pedLblOriginal'); if(lp) lp.textContent='VALOR TOTAL ORIGINAL';
   var lm=g('pedLblMargem');
   if(lm){
-    if(margensPed.length===0) lm.textContent='VALOR TOTAL COM MARGEM';
-    else if(margensPed.length===1) lm.textContent='VALOR TOTAL COM '+margensPed[0]+'%';
-    else { margensPed.sort(function(a,b){return a-b;}); lm.textContent='VALOR TOTAL COM MARGEM ('+margensPed.join('%, ')+'%)'; }
+    if(margensPed.length===0) lm.textContent='VALOR C/ MARGEM';
+    else if(margensPed.length===1) lm.textContent='VALOR C/ MARGEM '+margensPed[0]+'%';
+    else { lm.textContent='VALOR C/ MARGEM (misto)'; }
   }
 }
 
@@ -2361,6 +2382,7 @@ function getPedData(){
     ordemFornec:g('pedOrdemFornec'), pregao:g('pedPregao'), lote:g('pedLote'),
     orgao:g('pedOrgao'), cnpjOrgao:g('pedCnpjOrgao'), ieOrgao:g('pedIEOrgao'),
     enderecoOrgao:g('pedEnderecoOrgao'), enderecoEntrega:g('pedEnderecoEntrega'),
+    cidadeUF:g('pedCidadeUF'),
     transportador:g('pedTransportador'), frete:g('pedFrete'),
     vendedor:g('pedVendedor'), tel:g('pedTel'), email:g('pedEmail'), obs:g('pedObs'),
     desconto:disc, subtotal:sub, grand:sub*(1-disc/100),
@@ -2589,7 +2611,7 @@ function gerarPdfPedido(){
 
   // Data e local (linha)
   if(y+assinH>H-16){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=12; }
-  var cidade_ped=EMPRESA.cidade+' - '+EMPRESA.uf;
+  var cidade_ped=d.cidadeUF||(EMPRESA.cidade+' / '+EMPRESA.uf);
   doc.setFont('helvetica','italic'); doc.setFontSize(8.5); setC([90,110,130]);
   doc.text(cidade_ped+', __________ / __________ / __________', mL, y);
   y+=10;
@@ -2637,8 +2659,8 @@ function gerarPdfPedido(){
 
   // Campos abaixo da linha
   doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
-  doc.text('Nome: ________________________________________________', xB+6, y+23);
-  doc.text('CPF/CNPJ: _____________________   Data: ___/___/______', xB+6, y+28.5);
+  doc.text('Nome: ___________________________________', xB+6, y+23);
+  doc.text('CPF/CNPJ: _______________   Data: ___/___/______', xB+6, y+28.5);
 
   // Destinatário (nome do órgão pequeno)
   doc.setFont('helvetica','normal'); doc.setFontSize(7); setC(textSm);

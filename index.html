@@ -506,10 +506,9 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
         </div>
         <button class="btn-add-item" onclick="addItemRow()">➕ Adicionar Item</button>
         <div class="totals-row">
-          <div class="total-chip"><div class="tc-lbl">Subtotal Bruto</div><div class="tc-val" id="subtotal">R$ 0,00</div></div>
-          <div class="total-chip" style="border-color:#b8dacc">
-            <div class="tc-lbl" style="color:#1a5c2a">Total c/ Margem (bruto)</div>
-            <div class="tc-val" id="totalComMargem" style="color:#1a6b3a">R$ 0,00</div>
+          <div class="total-chip">
+            <div class="tc-lbl">Total de Itens</div>
+            <div class="tc-val" id="contadorItens" style="color:var(--navy)">0</div>
           </div>
           <div class="total-chip">
             <div class="tc-lbl">Desconto %</div>
@@ -520,12 +519,18 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
               <span style="font-size:13px;color:var(--text-sm)">%</span>
             </div>
           </div>
-          <div class="total-chip grand"><div class="tc-lbl">Total Geral (sem margem)</div><div class="tc-val" id="grandTotal">R$ 0,00</div></div>
+          <div class="total-chip grand">
+            <div class="tc-lbl" id="lblTotalOriginal">VALOR TOTAL ORIGINAL</div>
+            <div class="tc-val" id="grandTotal">R$ 0,00</div>
+          </div>
           <div class="total-chip grand" style="background:linear-gradient(135deg,#e8f5ee,#d4edda);border-color:#b8dacc">
-            <div class="tc-lbl" style="color:#1a5c2a">Total c/ Margem (final)</div>
+            <div class="tc-lbl" id="lblTotalMargem" style="color:#1a5c2a">VALOR TOTAL COM MARGEM</div>
             <div class="tc-val" id="grandTotalMargem" style="color:#1a6b3a;font-size:26px">R$ 0,00</div>
           </div>
         </div>
+        <!-- ids mantidos para compatibilidade, ocultos -->
+        <span id="subtotal" style="display:none"></span>
+        <span id="totalComMargem" style="display:none"></span>
       </div>
 
       <div class="form-card">
@@ -651,14 +656,22 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
                 <th style="width:64px">Qtd</th>
                 <th style="width:96px">Vlr Unit R$</th>
                 <th style="width:96px">Total R$</th>
+                <th style="width:70px;background:#1a5c2a">Margem %</th>
+                <th style="width:100px;background:#1a5c2a">c/ Margem R$</th>
               </tr></thead>
               <tbody id="pedItemsTbody"></tbody>
             </table>
           </div>
-          <div style="display:flex;justify-content:flex-end;gap:14px;margin-top:14px;flex-wrap:wrap">
-            <div class="total-chip"><div class="tc-lbl">Nº Itens</div><div class="tc-val" id="pedNItens">0</div></div>
-            <div class="total-chip"><div class="tc-lbl">Soma Qtdes</div><div class="tc-val" id="pedSomaQtd">0</div></div>
-            <div class="total-chip"><div class="tc-lbl">Desconto %</div>
+          <div style="display:flex;justify-content:flex-end;gap:14px;margin-top:14px;flex-wrap:wrap;align-items:flex-end">
+            <span id="pedNItens" style="display:none">0</span>
+            <span id="pedSomaQtd" style="display:none">0</span>
+            <span id="pedSubtotal" style="display:none">R$ 0,00</span>
+            <div class="total-chip">
+              <div class="tc-lbl">Total de Itens</div>
+              <div class="tc-val" id="pedContadorItens" style="color:var(--navy)">0</div>
+            </div>
+            <div class="total-chip">
+              <div class="tc-lbl">Desconto %</div>
               <div style="display:flex;align-items:center;gap:6px">
                 <input type="number" id="pedDesconto" min="0" max="100" step="0.1" value="0"
                   style="width:56px;padding:4px 8px;border:1.5px solid var(--gray-bd);border-radius:6px;font-size:14px;text-align:center"
@@ -666,8 +679,14 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
                 <span style="font-size:11px;color:var(--text-sm)">%</span>
               </div>
             </div>
-            <div class="total-chip"><div class="tc-lbl">Total Produtos</div><div class="tc-val" id="pedSubtotal">R$ 0,00</div></div>
-            <div class="total-chip grand"><div class="tc-lbl">Total Pedido</div><div class="tc-val" id="pedTotal">R$ 0,00</div></div>
+            <div class="total-chip grand">
+              <div class="tc-lbl" id="pedLblOriginal">VALOR TOTAL ORIGINAL</div>
+              <div class="tc-val" id="pedTotal">R$ 0,00</div>
+            </div>
+            <div class="total-chip grand" style="background:linear-gradient(135deg,#e8f5ee,#d4edda);border-color:#b8dacc">
+              <div class="tc-lbl" id="pedLblMargem" style="color:#1a5c2a">VALOR TOTAL COM MARGEM</div>
+              <div class="tc-val" id="pedTotalMargem" style="color:#1a6b3a;font-size:26px">R$ 0,00</div>
+            </div>
           </div>
         </div>
 
@@ -1214,6 +1233,7 @@ function recalcRow(id){
 }
 function recalcTotals(){
   var sub=0, subMarg=0;
+  var margens=[];
   document.querySelectorAll('#itemsBody tr').forEach(function(tr){
     var id=tr.id.replace('irow-','');
     var qty=parseFloat((document.getElementById('iqty-'+id)||{}).value||0)||0;
@@ -1222,14 +1242,36 @@ function recalcTotals(){
     var total=qty*unit;
     sub+=total;
     subMarg+=marg>0?qty*unit*(1+marg/100):total;
+    if(marg>0&&margens.indexOf(marg)<0) margens.push(marg);
   });
   var disc=parseFloat(document.getElementById('fDesc').value)||0;
-  document.getElementById('subtotal').textContent=fBRL(sub);
+  // Atualiza valores
   document.getElementById('grandTotal').textContent=fBRL(sub*(1-disc/100));
-  var tcm=document.getElementById('totalComMargem');
-  if(tcm) tcm.textContent=fBRL(subMarg);
   var gtm=document.getElementById('grandTotalMargem');
   if(gtm) gtm.textContent=fBRL(subMarg*(1-disc/100));
+  // Labels dinâmicas
+  var lblOrig=document.getElementById('lblTotalOriginal');
+  var lblMarg=document.getElementById('lblTotalMargem');
+  if(lblOrig) lblOrig.textContent='VALOR TOTAL ORIGINAL';
+  if(lblMarg){
+    if(margens.length===0){
+      lblMarg.textContent='VALOR TOTAL COM MARGEM';
+    } else if(margens.length===1){
+      lblMarg.textContent='VALOR TOTAL COM '+margens[0]+'%';
+    } else {
+      margens.sort(function(a,b){return a-b;});
+      lblMarg.textContent='VALOR TOTAL COM MARGEM ('+margens.join('%, ')+'%)';
+    }
+  }
+  // Compat hidden
+  var s=document.getElementById('subtotal'); if(s) s.textContent=fBRL(sub);
+  var t=document.getElementById('totalComMargem'); if(t) t.textContent=fBRL(subMarg);
+  // Contador de itens
+  var ci=document.getElementById('contadorItens');
+  if(ci){
+    var nItens=document.querySelectorAll('#itemsBody tr').length;
+    ci.textContent=nItens;
+  }
 }
 
 function fBRL(n){ return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
@@ -2228,6 +2270,7 @@ function preencherPedForm(cot){
     var tr=document.createElement('tr');
     tr.style.background=idx%2===0?'#fff':'#f6f9fc';
     function esc(s){ return (s||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    var pedMargVal=it.marg?String(it.marg):'0';
     tr.innerHTML=
       '<td style="text-align:center;font-weight:700;color:var(--navy)">'+(idx+1)+'</td>'+
       '<td><input type="text" value="'+esc(it.nome||it.desc||'')+'" oninput="recalcPed()" style="width:100%;font-weight:600"></td>'+
@@ -2236,7 +2279,18 @@ function preencherPedForm(cot){
       '<td><input type="text" value="'+esc(it.un||'UN')+'" style="width:100%"></td>'+
       '<td><input type="number" value="'+(it.qty||1)+'" min="0" step="any" oninput="recalcPed()" style="width:100%"></td>'+
       '<td><input type="number" value="'+(it.unit||0)+'" step="0.01" min="0" oninput="recalcPed()" style="width:100%"></td>'+
-      '<td style="font-weight:700;color:var(--blue);text-align:right;padding-right:6px" id="pedItot-'+idx+'">R$ 0,00</td>';
+      '<td style="font-weight:700;color:var(--blue);text-align:right;padding-right:6px;font-size:11px" id="pedItot-'+idx+'">R$ 0,00</td>'+
+      '<td style="text-align:center;padding:4px 3px">'+
+        '<select class="ped-marg-sel" onchange="recalcPed()" style="width:100%;padding:4px 2px;border:1.5px solid #b8dacc;border-radius:5px;font-size:12px;font-weight:700;color:#1a5c2a;background:#f0faf4">'+
+          '<option value="0"'+(pedMargVal==='0'?' selected':'')+'>—</option>'+
+          '<option value="30"'+(pedMargVal==='30'?' selected':'')+'>30%</option>'+
+          '<option value="35"'+(pedMargVal==='35'?' selected':'')+'>35%</option>'+
+          '<option value="40"'+(pedMargVal==='40'?' selected':'')+'>40%</option>'+
+          '<option value="45"'+(pedMargVal==='45'?' selected':'')+'>45%</option>'+
+          '<option value="50"'+(pedMargVal==='50'?' selected':'')+'>50%</option>'+
+        '</select>'+
+      '</td>'+
+      '<td style="font-weight:700;color:#1a6b3a;text-align:right;padding-right:6px;background:#f0faf4;font-size:11px" id="pedItotM-'+idx+'">—</td>';
     tbody.appendChild(tr);
   });
   recalcPed();
@@ -2247,20 +2301,44 @@ function preencherPedForm(cot){
 
 function recalcPed(){
   var rows=document.querySelectorAll('#pedItemsTbody tr');
-  var sub=0,somaQtd=0;
+  var sub=0, subMarg=0, somaQtd=0;
+  var margensPed=[];
   rows.forEach(function(tr,idx){
     var nums=tr.querySelectorAll('input[type=number]');
     var qty=parseFloat(nums[0]?nums[0].value:0)||0, unit=parseFloat(nums[1]?nums[1].value:0)||0;
-    var total=qty*unit; sub+=total; somaQtd+=qty;
-    var te=document.getElementById('pedItot-'+idx); if(te) te.textContent='R$ '+total.toLocaleString('pt-BR',{minimumFractionDigits:2});
+    // Buscar select de margem na linha
+    var margSel=tr.querySelector('select.ped-marg-sel');
+    var marg=margSel?parseFloat(margSel.value||0)||0:0;
+    var total=qty*unit;
+    var totalM=marg>0?qty*unit*(1+marg/100):total;
+    sub+=total; subMarg+=totalM; somaQtd+=qty;
+    if(marg>0&&margensPed.indexOf(marg)<0) margensPed.push(marg);
+    var te=document.getElementById('pedItot-'+idx);
+    if(te) te.textContent='R$ '+total.toLocaleString('pt-BR',{minimumFractionDigits:2});
+    var tem=document.getElementById('pedItotM-'+idx);
+    if(tem){
+      tem.textContent=marg>0?'R$ '+totalM.toLocaleString('pt-BR',{minimumFractionDigits:2}):'—';
+      tem.style.color=marg>0?'#1a6b3a':'#999';
+    }
   });
   var disc=parseFloat(document.getElementById('pedDesconto').value)||0;
   var grand=sub*(1-disc/100);
+  var grandM=subMarg*(1-disc/100);
   var g=function(id){ return document.getElementById(id); };
   if(g('pedSubtotal')) g('pedSubtotal').textContent='R$ '+sub.toLocaleString('pt-BR',{minimumFractionDigits:2});
   if(g('pedTotal'))    g('pedTotal').textContent='R$ '+grand.toLocaleString('pt-BR',{minimumFractionDigits:2});
   if(g('pedNItens'))   g('pedNItens').textContent=rows.length;
   if(g('pedSomaQtd'))  g('pedSomaQtd').textContent=somaQtd;
+  if(g('pedTotalMargem')) g('pedTotalMargem').textContent='R$ '+grandM.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  // Labels dinâmicas
+  if(g('pedContadorItens')) g('pedContadorItens').textContent=rows.length;
+  var lp=g('pedLblOriginal'); if(lp) lp.textContent='VALOR TOTAL ORIGINAL';
+  var lm=g('pedLblMargem');
+  if(lm){
+    if(margensPed.length===0) lm.textContent='VALOR TOTAL COM MARGEM';
+    else if(margensPed.length===1) lm.textContent='VALOR TOTAL COM '+margensPed[0]+'%';
+    else { margensPed.sort(function(a,b){return a-b;}); lm.textContent='VALOR TOTAL COM MARGEM ('+margensPed.join('%, ')+'%)'; }
+  }
 }
 
 function getPedItems(){
@@ -2354,16 +2432,19 @@ function gerarPdfPedido(){
   y+=pedHdrH+4;
 
   // Título pedido
-  setF(navy); doc.rect(mL,y,cW,8,'F');
-  setF(navy2); doc.rect(mL,y,3,8,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); setC(white);
-  doc.text('PEDIDO DE VENDA: '+d.num, W/2, y+5.5, {align:'center'});
-  y+=8;
+  setF(navy); doc.rect(mL,y,cW,9,'F');
+  setF(navy2); doc.rect(mL,y,3,9,'F');
+  // Titulo principal centralizado
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); setC(white);
+  doc.text('TERMO DE ENTREGA', W/2, y+6, {align:'center'});
+  y+=9;
+  // Subtítulo com nº pedido + proposta ref
   setF([232,241,252]); doc.rect(mL,y,cW,6,'F');
   setD(navy2); doc.setLineWidth(0.3);
   doc.line(mL,y,mL+cW,y); doc.line(mL,y+6,mL+cW,y+6);
   doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setC(navy);
-  doc.text('PROPOSTA REF: '+(d.cotRef||'—')+(d.pregao?' | '+d.pregao:'')+(d.lote?' | LOTE '+d.lote:''), W/2, y+4.2, {align:'center'});
+  var subTitulo='Nº '+d.num+(d.cotRef?' – PROPOSTA REF: '+d.cotRef:'')+(d.pregao?' | '+d.pregao:'')+(d.lote?' | LOTE '+d.lote:'');
+  doc.text(subTitulo, W/2, y+4.2, {align:'center'});
   y+=9;
 
   // Info boxes — espaçados e limpos
@@ -2486,9 +2567,89 @@ function gerarPdfPedido(){
     y+=obsH+8;
   }
 
+  // ═══════════════════════════════════════════════════
+  // BLOCO DE ASSINATURAS — dinâmico, cabe na página atual
+  // ou quebra para nova se não houver espaço
+  // ═══════════════════════════════════════════════════
+  var assinH=52; // altura total do bloco
+  if(y+assinH>H-16){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=12; }
+
+  y+=6;
+  // Linha divisória sutil antes das assinaturas
+  setD([200,215,235]); doc.setLineWidth(0.4);
+  doc.line(mL,y,mL+cW,y);
+  y+=6;
+
+  // Texto declaratório
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); setC([90,110,130]);
+  var declTxt='Declaro que os materiais/produtos constantes neste Termo de Entrega foram recebidos em perfeita conformidade com o pedido, quantidade e especificações acordadas.';
+  var declLines=doc.splitTextToSize(declTxt, cW);
+  doc.text(declLines, mL, y);
+  y+=declLines.length*3.8+8;
+
+  // Data e local (linha)
+  if(y+assinH>H-16){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=12; }
+  var cidade_ped=EMPRESA.cidade+' - '+EMPRESA.uf;
+  doc.setFont('helvetica','italic'); doc.setFontSize(8.5); setC([90,110,130]);
+  doc.text(cidade_ped+', __________ / __________ / __________', mL, y);
+  y+=10;
+
+  // Dois blocos de assinatura lado a lado
+  var colA=cW*0.46, colB=cW*0.46, gap=cW*0.08;
+  var xA=mL, xB=mL+colA+gap;
+
+  // ── BLOCO ESQUERDO: Empresa fornecedora ──
+  // Fundo levemente colorido
+  setF([240,246,255]); doc.roundedRect(xA,y,colA,36,2,2,'F');
+  setD([180,205,230]); doc.setLineWidth(0.3); doc.roundedRect(xA,y,colA,36,2,2,'S');
+  setF(navy2); doc.rect(xA,y,3,36,'F'); // faixa esq
+
+  // Label topo
+  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); setC([100,130,165]);
+  doc.text('FORNECEDOR', xA+6, y+4.5);
+
+  // Linha de assinatura
+  setD([150,175,205]); doc.setLineWidth(0.5);
+  doc.line(xA+6, y+18, xA+colA-6, y+18);
+
+  // Nome empresa
+  doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setC(navy);
+  doc.text(EMPRESA.razaoSocial, xA+colA/2, y+23, {align:'center'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
+  doc.text('CNPJ: '+EMPRESA.cnpj, xA+colA/2, y+27.5, {align:'center'});
+
+  // Cargo/responsável
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
+  doc.text(d.vendedor||'Sócio Administrador', xA+colA/2, y+32, {align:'center'});
+
+  // ── BLOCO DIREITO: Recebedor ──
+  setF([248,252,248]); doc.roundedRect(xB,y,colB,36,2,2,'F');
+  setD([180,215,190]); doc.setLineWidth(0.3); doc.roundedRect(xB,y,colB,36,2,2,'S');
+  setF([26,140,80]); doc.rect(xB,y,3,36,'F'); // faixa esq verde
+
+  // Label topo
+  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); setC([40,120,70]);
+  doc.text('RECEBIDO POR', xB+6, y+4.5);
+
+  // Linha de assinatura
+  setD([150,200,160]); doc.setLineWidth(0.5);
+  doc.line(xB+6, y+18, xB+colB-6, y+18);
+
+  // Campos abaixo da linha
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
+  doc.text('Nome: ________________________________________________', xB+6, y+23);
+  doc.text('CPF/CNPJ: _____________________   Data: ___/___/______', xB+6, y+28.5);
+
+  // Destinatário (nome do órgão pequeno)
+  doc.setFont('helvetica','normal'); doc.setFontSize(7); setC(textSm);
+  var orgShort=doc.splitTextToSize(d.orgao||'',colB-12)[0]||'';
+  doc.text(orgShort, xB+colB/2, y+33.5, {align:'center'});
+
+  y+=36+8;
+
   addPdfFooterJCG(doc,W,H,mL,mR);
   var sigla=(d.orgao||'pedido').split('-').pop().trim().replace(/[^a-zA-Z0-9 ]/g,'').trim().substring(0,20)||'pedido';
-  var fname=sigla+(d.ordemFornec?' - OF '+d.ordemFornec.trim():'')+' - '+d.num+'.pdf';
+  var fname='TERMO DE ENTREGA - '+sigla+(d.ordemFornec?' - OF '+d.ordemFornec.trim():'')+' - '+d.num+'.pdf';
   doc.save(fname);
   var pedIdChk='ped_'+d.num;
   var existePed=history_.findIndex(function(h){ return h.tipo==='pedido'&&(h.id===pedIdChk||h.num===d.num); });

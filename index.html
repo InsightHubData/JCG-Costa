@@ -995,9 +995,12 @@ try { history_  = JSON.parse(localStorage.getItem('sn_hist2')  || '[]'); } catch
 try { clients_  = JSON.parse(localStorage.getItem('sn_cli2')   || '[]'); } catch(e){ clients_=[]; }
 try { products_ = JSON.parse(localStorage.getItem('sn_prod2')  || '[]'); } catch(e){ products_=[]; }
 
-function saveLS(){
+function saveLS(itemEspecifico){
   try{ localStorage.setItem('sn_hist2', JSON.stringify(history_)); } catch(e){}
-  history_.forEach(function(h){
+  // Se um item específico for passado, salva só ele no Firebase
+  // Caso contrário, salva todos (compatibilidade)
+  var lista=itemEspecifico?[itemEspecifico]:history_;
+  lista.forEach(function(h){
     if(!h||!h.id) return;
     if(h.tipo==='pedido'){ if(typeof window.fbSavePedido==='function') window.fbSavePedido(h); }
     else { if(typeof window.fbSaveProposta==='function') window.fbSaveProposta(h); }
@@ -1807,7 +1810,7 @@ async function generatePDF(){
   if(_d.num&&_d.orgao){
     var _hi=history_.findIndex(function(h){ return h.tipo!=='pedido'&&(String(h.id)===String(_d.id)||h.num===_d.num); });
     if(_hi>=0){ _d.id=history_[_hi].id; history_[_hi]=_d; } else { history_.unshift(_d); nextProposalNum(true); }
-    editingId=_d.id; saveLS(); renderHist();
+    editingId=_d.id; saveLS(_d); renderHist();
   }
   toast('PDF gerado com sucesso!','ok');
 }
@@ -1903,7 +1906,7 @@ function saveHist(){
   if(!d.num||!d.orgao){ toast('Preencha ao menos Nº e Destinatário.','err'); return; }
   var idx=history_.findIndex(function(h){ return h.tipo!=='pedido'&&(String(h.id)===String(d.id)||h.num===d.num); });
   if(idx>=0){ d.id=history_[idx].id; history_[idx]=d; } else { history_.unshift(d); nextProposalNum(true); }
-  editingId=d.id; saveLS(); toast('Proposta salva!','ok');
+  editingId=d.id; saveLS(d); toast('Proposta salva!','ok');
 }
 
 function weekKey(date){
@@ -2013,8 +2016,21 @@ function editProp(arg){
 
 function rePDF(arg){
   var id=_resolveHid(arg); var h=_findHist(id); if(!h) return;
-  if(h.tipo==='pedido'){ var propRef=history_.find(function(p){ return p.tipo!=='pedido'&&(p.num===h.cotRef||p.num===h.num); }); if(propRef){ preencherPedForm(propRef); document.getElementById('pedNum').value=h.num||''; } setTimeout(function(){ gerarPdfPedido(); },400); }
-  else { editProp(id); setTimeout(function(){ generatePDF(); },300); }
+  if(h.tipo==='pedido'){
+    // Carregar dados do pedido salvo e gerar PDF direto, sem navegar para aba
+    var propRef=history_.find(function(p){ return p.tipo!=='pedido'&&(p.num===h.cotRef||p.num===h.num); });
+    if(propRef){
+      // Preencher form em background sem mudar aba
+      preencherPedForm(propRef);
+      document.getElementById('pedNum').value=h.num||'';
+      document.getElementById('pedCotRef').value=h.cotRef||'';
+    }
+    // Gerar PDF diretamente sem esperar navegação de aba
+    setTimeout(function(){ gerarPdfPedido(); },350);
+  } else {
+    editProp(id);
+    setTimeout(function(){ generatePDF(); },300);
+  }
 }
 function clearHist(){ if(!confirm('Limpar todo o histórico?')) return; history_=[]; saveLS(); renderHist(); toast('Histórico limpo.',''); }
 
@@ -2369,7 +2385,12 @@ function getPedItems(){
     var nums=tr.querySelectorAll('input[type=number]');
     var nome=inputs[0]?inputs[0].value:'', marca=inputs[1]?inputs[1].value:'', fabric=inputs[2]?inputs[2].value:'', un=inputs[3]?inputs[3].value:'UN';
     var qty=parseFloat(nums[0]?nums[0].value:0)||0, unit=parseFloat(nums[1]?nums[1].value:0)||0;
-    items.push({ num:idx+1, nome:nome, marca:marca, fabricante:fabric, un:un, qty:qty, unit:unit, total:qty*unit });
+    var margSel=tr.querySelector('select.ped-marg-sel');
+    var marg=margSel?parseFloat(margSel.value||0)||0:0;
+    var unitFinal=marg>0?unit*(1+marg/100):unit;
+    items.push({ num:idx+1, nome:nome, marca:marca, fabricante:fabric, un:un,
+      qty:qty, unit:unit, marg:marg, unitFinal:unitFinal,
+      total:qty*unit, totalFinal:qty*unitFinal });
   });
   return items;
 }
@@ -2397,7 +2418,9 @@ function salvarPedido(){
   var hi=history_.findIndex(function(h){ return h.tipo==='pedido'&&(h.id===pedId||h.num===d.num); });
   var hEntry={ id:pedId, tipo:'pedido', num:d.num, data:d.data, orgao:d.orgao, pregao:d.pregao||'', lote:d.lote||'', cotRef:d.cotRef, grand:d.grand, status:'Pendente', semana:weekKey(new Date()) };
   if(hi>=0) history_[hi]=hEntry; else history_.unshift(hEntry);
-  saveLS(); pedSeq_++; localStorage.setItem('jcg_ped_seq',pedSeq_);
+  saveLS(hEntry); pedSeq_++; localStorage.setItem('jcg_ped_seq',pedSeq_);
+  // Forçar save no Firebase diretamente também
+  if(typeof window.fbSavePedido==='function') window.fbSavePedido(hEntry);
   toast('Pedido '+d.num+' salvo!','ok');
 }
 
@@ -2511,11 +2534,16 @@ function gerarPdfPedido(){
   setD(grayBd); doc.setLineWidth(0.2);
   d.items.forEach(function(it,i){
     if(y>H-30){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=10; }
+    // Usar valor COM margem se disponível, senão bruto
+    var pedUnit=it.marg>0?it.unitFinal:it.unit;
+    var pedTotal=it.marg>0?it.totalFinal:it.total;
+    if(!pedUnit) pedUnit=it.unit; if(!pedTotal) pedTotal=it.total;
+    var rowH=12; // altura maior para mais espaço entre itens
     var bg=i%2===0?white:[245,248,252];
-    setF(bg); doc.rect(mL,y,cW,8,'F'); setD(grayBd); doc.rect(mL,y,cW,8,'S');
+    setF(bg); doc.rect(mL,y,cW,rowH,'F'); setD(grayBd); doc.rect(mL,y,cW,rowH,'S');
     var vx3=mL+col2.num;
-    [col2.nome,col2.marca,col2.fabric,col2.un,col2.qtd,col2.unit].forEach(function(w){ doc.line(vx3,y,vx3,y+8); vx3+=w; });
-    var midY=y+5; var cx3=mL;
+    [col2.nome,col2.marca,col2.fabric,col2.un,col2.qtd,col2.unit].forEach(function(w){ doc.line(vx3,y,vx3,y+rowH); vx3+=w; });
+    var midY=y+rowH/2+1.5; var cx3=mL;
     doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setC(navy);
     doc.text(String(it.num||i+1).padStart(2,'0'),cx3+col2.num/2,midY,{align:'center'}); cx3+=col2.num;
     doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(text_);
@@ -2528,20 +2556,20 @@ function gerarPdfPedido(){
     doc.text(it.un||'UN',cx3+col2.un/2,midY,{align:'center'}); cx3+=col2.un;
     doc.text(String(it.qty||0),cx3+col2.qtd/2,midY,{align:'center'}); cx3+=col2.qtd;
     doc.setFont('helvetica','normal');
-    doc.text(fBpN(it.unit),cx3+col2.unit/2,midY,{align:'center'}); cx3+=col2.unit;
+    doc.text(fBpN(pedUnit),cx3+col2.unit/2,midY,{align:'center'}); cx3+=col2.unit;
     doc.setFont('helvetica','bold'); setC(navy);
-    doc.text(fBpN(it.total),cx3+col2.total/2,midY,{align:'center'});
-    y+=8;
-    // linhas extenso
+    doc.text(fBpN(pedTotal),cx3+col2.total/2,midY,{align:'center'});
+    y+=rowH;
+    // linhas extenso com margem
     setF([248,252,248]); doc.rect(mL,y,cW,3.5,'F');
     setD(grayBd); doc.rect(mL,y,cW,3.5,'S');
     doc.setFont('helvetica','normal'); doc.setFontSize(7); setC(textSm);
-    doc.text('Valor Unitário: = = = >>>'+valorPorExtenso(it.unit).toUpperCase(),mL+1,y+2.4);
+    doc.text('Valor Unitário: = = = >>>'+valorPorExtenso(pedUnit).toUpperCase(),mL+1,y+2.4);
     y+=3.5;
     setF([245,250,245]); doc.rect(mL,y,cW,3.5,'F');
     setD(grayBd); doc.rect(mL,y,cW,3.5,'S');
-    doc.text('Valor Total: = = = >>>'+valorPorExtenso(it.total).toUpperCase(),mL+1,y+2.4);
-    y+=4.5;
+    doc.text('Valor Total: = = = >>>'+valorPorExtenso(pedTotal).toUpperCase(),mL+1,y+2.4);
+    y+=6; // maior espaço entre itens
   });
   y+=4;
 
@@ -2657,15 +2685,16 @@ function gerarPdfPedido(){
   setD([150,200,160]); doc.setLineWidth(0.5);
   doc.line(xB+6, y+18, xB+colB-6, y+18);
 
-  // Campos abaixo da linha
+  // Campos abaixo da linha — sem linha duplicada de Nome
   doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
-  doc.text('Nome: ___________________________________', xB+6, y+23);
-  doc.text('CPF/CNPJ: _______________   Data: ___/___/______', xB+6, y+28.5);
+  doc.text('Nome: ___________________________________', xB+6, y+23.5);
+  doc.text('CPF/CNPJ: _______________', xB+6, y+29);
+  doc.text('Data: ___/___/______', xB+colB*0.55, y+29);
 
   // Destinatário (nome do órgão pequeno)
   doc.setFont('helvetica','normal'); doc.setFontSize(7); setC(textSm);
   var orgShort=doc.splitTextToSize(d.orgao||'',colB-12)[0]||'';
-  doc.text(orgShort, xB+colB/2, y+33.5, {align:'center'});
+  doc.text(orgShort, xB+colB/2, y+34, {align:'center'});
 
   y+=36+8;
 
@@ -2675,7 +2704,12 @@ function gerarPdfPedido(){
   doc.save(fname);
   var pedIdChk='ped_'+d.num;
   var existePed=history_.findIndex(function(h){ return h.tipo==='pedido'&&(h.id===pedIdChk||h.num===d.num); });
-  if(existePed<0){ salvarPedido(); } else { history_[existePed].grand=d.grand; saveLS(); renderHist(); }
+  if(existePed<0){ salvarPedido(); } else {
+    history_[existePed].grand=d.grand;
+    saveLS(history_[existePed]);
+    if(typeof window.fbSavePedido==='function') window.fbSavePedido(history_[existePed]);
+    renderHist();
+  }
   toast('PDF do Pedido gerado!','ok');
 }
 </script>

@@ -724,10 +724,10 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
       <div class="sec-title">📋 Histórico</div>
       <div class="sec-sub">Visualize e gerencie todas as propostas e pedidos.</div>
       <div class="sum-row">
-        <div class="sum-card blue"><div class="sc-lbl">Esta semana</div><div class="sc-val" id="smTot">0</div></div>
-        <div class="sum-card green"><div class="sc-lbl">Valor Total R$</div><div class="sc-val" id="smVal">R$ 0</div></div>
-        <div class="sum-card"><div class="sc-lbl">Enviadas</div><div class="sc-val" id="smEnv">0</div></div>
-        <div class="sum-card"><div class="sc-lbl">Pendentes</div><div class="sc-val" id="smPend">0</div></div>
+        <div class="sum-card blue"><div class="sc-lbl">Pedidos Essa Semana</div><div class="sc-val" id="smTot">0</div></div>
+        <div class="sum-card green"><div class="sc-lbl">Valor Total Pedidos R$</div><div class="sc-val" id="smVal">R$ 0</div></div>
+        <div class="sum-card"><div class="sc-lbl">Entregues</div><div class="sc-val" id="smEnv">0</div></div>
+        <div class="sum-card"><div class="sc-lbl">Não Entregues</div><div class="sc-val" id="smPend">0</div></div>
       </div>
       <div class="hist-filters">
         <div>
@@ -737,8 +737,13 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
         <div>
           <label style="font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--navy);display:block;margin-bottom:5px">Status</label>
           <select id="fStatus" onchange="renderHist()">
-            <option value="">Todos</option><option>Enviada</option><option>Pendente</option>
-            <option>Ganha</option><option>Cancelada</option>
+            <option value="">Todos</option>
+            <option>Entregue</option>
+            <option>Não Entregue</option>
+            <option>Pendente</option>
+            <option>Enviada</option>
+            <option>Ganha</option>
+            <option>Cancelada</option>
           </select>
         </div>
         <div>
@@ -1189,14 +1194,12 @@ function addItemRow(data){
     '<td><input type="number" id="iunit-'+id+'" value="'+(row.unit||'')+'" min="0" step="0.01" placeholder="0,00" oninput="recalcRow('+id+')" onchange="recalcRow('+id+')" style="width:100%"></td>'+
     '<td id="itot-'+id+'" style="font-weight:700;color:var(--navy);text-align:right;padding-right:6px;font-size:11px">R$ 0,00</td>'+
     '<td style="text-align:center;padding:4px 3px">'+
-      '<select id="imarg-'+id+'" onchange="recalcRow('+id+')" style="width:100%;padding:4px 2px;border:1.5px solid #b8dacc;border-radius:5px;font-size:12px;font-weight:700;color:#1a5c2a;background:#f0faf4;text-align:center">'+
-        '<option value="0">—</option>'+
-        '<option value="30">30%</option>'+
-        '<option value="35">35%</option>'+
-        '<option value="40">40%</option>'+
-        '<option value="45">45%</option>'+
-        '<option value="50">50%</option>'+
-      '</select>'+
+      '<div style="display:flex;align-items:center;gap:2px">'+
+        '<input type="number" id="imarg-'+id+'" value="'+(row.marg||'')+'" min="0" max="999" step="0.1" placeholder="0" '+
+          'oninput="recalcRow('+id+')" onchange="recalcRow('+id+')" '+
+          'style="width:100%;padding:3px 4px;border:1.5px solid #b8dacc;border-radius:5px;font-size:12px;font-weight:700;color:#1a5c2a;background:#f0faf4;text-align:center">'+
+        '<span style="font-size:10px;color:#1a5c2a;font-weight:700;flex-shrink:0">%</span>'+
+      '</div>'+
     '</td>'+
     '<td id="itotmarg-'+id+'" style="font-weight:700;color:#1a6b3a;text-align:right;padding-right:8px;background:#f0faf4">R$ 0,00</td>'+
     '<td>'+
@@ -1211,10 +1214,7 @@ function addItemRow(data){
   tbody.appendChild(tr);
   if(row.img){ itemImages[id]=row.img; showImgPreview(id,row.img); }
   // Restaurar margem salva no histórico
-  if(row.marg){
-    var ms=document.getElementById('imarg-'+id);
-    if(ms){ ms.value=String(row.marg); }
-  }
+  // marg já preenchida direto no value do input acima
   recalcRow(id); recalcTotals();
 }
 
@@ -1229,8 +1229,8 @@ function fillItemFromProd(rowId, prod){
   if(f('iunit-'+rowId))  f('iunit-'+rowId).value  = prod.preco||'';
   if(prod.img){ itemImages[rowId]=prod.img; showImgPreview(rowId,prod.img); }
   // Restaurar margem se vier do produto
-  var margSel=document.getElementById('imarg-'+rowId);
-  if(margSel&&prod.marg){ margSel.value=String(prod.marg); }
+  var margInpEl=document.getElementById('imarg-'+rowId);
+  if(margInpEl&&prod.marg){ margInpEl.value=String(prod.marg); }
   recalcRow(rowId); recalcTotals();
   ['icod-list-'+rowId,'inome-list-'+rowId].forEach(function(lid){ var el=document.getElementById(lid); if(el) el.style.display='none'; });
 }
@@ -1976,10 +1976,12 @@ function renderHist(){
     return(!sem||h.semana===sem)&&(!st||h.status===st)&&
       (!bk||[h.num,h.orgao,h.pregao,h.lote].some(function(v){ return (v||'').toLowerCase().includes(bk); }));
   });
-  document.getElementById('smTot').textContent=f.length;
-  document.getElementById('smVal').textContent='R$ '+f.reduce(function(a,h){ return a+(h.grand||0); },0).toLocaleString('pt-BR',{minimumFractionDigits:2});
-  document.getElementById('smEnv').textContent=f.filter(function(h){ return h.status==='Enviada'; }).length;
-  document.getElementById('smPend').textContent=f.filter(function(h){ return h.status==='Pendente'; }).length;
+  var fPed=f.filter(function(h){ return h.tipo==='pedido'; });
+  var fPedSem=history_.filter(function(h){ return h.tipo==='pedido'&&h.semana===document.getElementById('fSemana').value; });
+  document.getElementById('smTot').textContent=fPedSem.length;
+  document.getElementById('smVal').textContent='R$ '+fPed.reduce(function(a,h){ return a+(h.grand||0); },0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('smEnv').textContent=fPed.filter(function(h){ return h.status==='Entregue'; }).length;
+  document.getElementById('smPend').textContent=fPed.filter(function(h){ return h.status!=='Entregue'; }).length;
   var tbody=document.getElementById('histBody'), empty=document.getElementById('histEmpty');
   tbody.innerHTML='';
   if(!f.length){ empty.style.display='block'; return; }
@@ -1994,8 +1996,13 @@ function renderHist(){
       '<td>'+(h.orgao||'—')+'</td>'+
       '<td>'+(h.lote?'Lote '+h.lote+' — ':'')+(h.pregao||'—')+'</td>'+
       '<td><strong>'+fBRL(h.grand||0)+'</strong></td>'+
-      '<td><select onchange="updStatus('+h.id+',this.value)" style="padding:3px 6px;border-radius:5px;border:1px solid var(--gray-bd);font-size:12px">'+
-        ['Pendente','Enviada','Ganha','Cancelada'].map(function(s){ return '<option value="'+s+'" '+(h.status===s?'selected':'')+'>'+s+'</option>'; }).join('')+'</select></td>'+
+      '<td>'+(function(){
+        var opts=h.tipo==='pedido'
+          ?['Não Entregue','Entregue']
+          :['Pendente','Enviada','Ganha','Cancelada'];
+        return '<select onchange="updStatus('+h.id+',this.value)" style="padding:3px 6px;border-radius:5px;border:1px solid var(--gray-bd);font-size:12px">'+
+          opts.map(function(s){ return '<option value="'+s+'" '+(h.status===s?'selected':'')+'>'+s+'</option>'; }).join('')+'</select>';
+      })()+'</td>'+
       '<td><div class="hist-acts">'+
         '<button class="btn-sm btn-sm-b" title="Editar" onclick="editProp(this)" data-hid="'+h.id+'">✏️</button>'+
         '<button class="btn-sm btn-sm-g" title="PDF" onclick="rePDF(this)" data-hid="'+h.id+'">🖨️</button>'+
@@ -2369,14 +2376,12 @@ function preencherPedForm(cot){
       '<td><input type="number" value="'+(it.unit||0)+'" step="0.01" min="0" oninput="recalcPed()" style="width:100%"></td>'+
       '<td style="font-weight:700;color:var(--blue);text-align:right;padding-right:6px;font-size:11px" id="pedItot-'+idx+'">R$ 0,00</td>'+
       '<td style="text-align:center;padding:4px 3px">'+
-        '<select class="ped-marg-sel" onchange="recalcPed()" style="width:100%;padding:4px 2px;border:1.5px solid #b8dacc;border-radius:5px;font-size:12px;font-weight:700;color:#1a5c2a;background:#f0faf4">'+
-          '<option value="0"'+(pedMargVal==='0'?' selected':'')+'>—</option>'+
-          '<option value="30"'+(pedMargVal==='30'?' selected':'')+'>30%</option>'+
-          '<option value="35"'+(pedMargVal==='35'?' selected':'')+'>35%</option>'+
-          '<option value="40"'+(pedMargVal==='40'?' selected':'')+'>40%</option>'+
-          '<option value="45"'+(pedMargVal==='45'?' selected':'')+'>45%</option>'+
-          '<option value="50"'+(pedMargVal==='50'?' selected':'')+'>50%</option>'+
-        '</select>'+
+        '<div style="display:flex;align-items:center;gap:2px">'+
+          '<input type="number" class="ped-marg-inp" value="'+(it.marg||'')+'" min="0" max="999" step="0.1" placeholder="0" '+
+            'oninput="recalcPed()" onchange="recalcPed()" '+
+            'style="width:100%;padding:3px 4px;border:1.5px solid #b8dacc;border-radius:5px;font-size:12px;font-weight:700;color:#1a5c2a;background:#f0faf4;text-align:center">'+
+          '<span style="font-size:10px;color:#1a5c2a;font-weight:700;flex-shrink:0">%</span>'+
+        '</div>'+
       '</td>'+
       '<td style="font-weight:700;color:#1a6b3a;text-align:right;padding-right:6px;background:#f0faf4;font-size:11px" id="pedItotM-'+idx+'">—</td>';
     tbody.appendChild(tr);
@@ -2395,8 +2400,8 @@ function recalcPed(){
     var nums=tr.querySelectorAll('input[type=number]');
     var qty=parseFloat(nums[0]?nums[0].value:0)||0, unit=parseFloat(nums[1]?nums[1].value:0)||0;
     // Buscar select de margem na linha
-    var margSel=tr.querySelector('select.ped-marg-sel');
-    var marg=margSel?parseFloat(margSel.value||0)||0:0;
+    var margInp=tr.querySelector('input.ped-marg-inp');
+    var marg=margInp?parseFloat(margInp.value||0)||0:0;
     var total=qty*unit;
     var totalM=marg>0?qty*unit*(1+marg/100):total;
     sub+=total; subMarg+=totalM; somaQtd+=qty;
@@ -2436,8 +2441,8 @@ function getPedItems(){
     var nums=tr.querySelectorAll('input[type=number]');
     var nome=inputs[0]?inputs[0].value:'', marca=inputs[1]?inputs[1].value:'', fabric=inputs[2]?inputs[2].value:'', un=inputs[3]?inputs[3].value:'UN';
     var qty=parseFloat(nums[0]?nums[0].value:0)||0, unit=parseFloat(nums[1]?nums[1].value:0)||0;
-    var margSel=tr.querySelector('select.ped-marg-sel');
-    var marg=margSel?parseFloat(margSel.value||0)||0:0;
+    var margInp=tr.querySelector('input.ped-marg-inp');
+    var marg=margInp?parseFloat(margInp.value||0)||0:0;
     var unitFinal=marg>0?unit*(1+marg/100):unit;
     items.push({ num:idx+1, nome:nome, marca:marca, fabricante:fabric, un:un,
       qty:qty, unit:unit, marg:marg, unitFinal:unitFinal,

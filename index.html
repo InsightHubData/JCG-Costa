@@ -1125,6 +1125,30 @@ function switchTab(el){
   document.getElementById(el.dataset.tab).classList.add('active');
   if(el.dataset.tab==='tabHist'){ setWeekFilter(); renderHist(); }
   if(el.dataset.tab==='tabCad') renderCadLists();
+  // Sair da proposta para outra aba → limpar editingId
+  if(el.dataset.tab!=='tabProp') editingId=null;
+  // Ao clicar na aba Nova Proposta diretamente (não pelo editProp),
+  // limpa o formulário se não houver edição em andamento
+  if(el.dataset.tab==='tabProp'&&!editingId){
+    _limparPropSilencioso();
+  }
+}
+function _limparPropSilencioso(){
+  ['fPregao','fOrgao','fCnpjOrgao','fCidadeOrgao','fRespOrgao','fLocal','fLote'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.value='';
+  });
+  document.getElementById('fValidade').value='60';
+  document.getElementById('fValProp').value='60 (sessenta) dias';
+  document.getElementById('fPgto').value='Conforme edital';
+  document.getElementById('fEntrega').value='Conforme edital';
+  document.getElementById('fVendedor').value='Sócio Administrador';
+  document.getElementById('fTel').value='(92) 98502-6382';
+  document.getElementById('fEmail').value='elicitacoes2023@gmail.com';
+  document.getElementById('fDesc').value='0';
+  document.getElementById('fData').value=new Date().toISOString().split('T')[0];
+  document.getElementById('itemsBody').innerHTML='';
+  itemCnt=0; itemImages={};
+  recalcTotals(); nextProposalNum(); addItemRow();
 }
 
 /* ═══════════════════════════════════════
@@ -1979,7 +2003,7 @@ function renderHist(){
   var fPed=f.filter(function(h){ return h.tipo==='pedido'; });
   var fPedSem=history_.filter(function(h){ return h.tipo==='pedido'&&h.semana===document.getElementById('fSemana').value; });
   document.getElementById('smTot').textContent=fPedSem.length;
-  document.getElementById('smVal').textContent='R$ '+fPed.reduce(function(a,h){ return a+(h.grand||0); },0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('smVal').textContent='R$ '+fPed.reduce(function(a,h){ return a+(h.grandFinal||h.grand||0); },0).toLocaleString('pt-BR',{minimumFractionDigits:2});
   document.getElementById('smEnv').textContent=fPed.filter(function(h){ return h.status==='Entregue'; }).length;
   document.getElementById('smPend').textContent=fPed.filter(function(h){ return h.status!=='Entregue'; }).length;
   var tbody=document.getElementById('histBody'), empty=document.getElementById('histEmpty');
@@ -1995,7 +2019,7 @@ function renderHist(){
       '<td>'+(h.data?new Date(h.data+'T12:00:00').toLocaleDateString('pt-BR'):'—')+'</td>'+
       '<td>'+(h.orgao||'—')+'</td>'+
       '<td>'+(h.lote?'Lote '+h.lote+' — ':'')+(h.pregao||'—')+'</td>'+
-      '<td><strong>'+fBRL(h.grand||0)+'</strong></td>'+
+      '<td><strong>'+fBRL(h.grandFinal||h.grand||0)+'</strong></td>'+
       '<td>'+(function(){
         var opts=h.tipo==='pedido'
           ?['Não Entregue','Entregue']
@@ -2463,7 +2487,7 @@ function getPedData(){
     transportador:g('pedTransportador'), frete:g('pedFrete'),
     vendedor:g('pedVendedor'), tel:g('pedTel'), email:g('pedEmail'), obs:g('pedObs'),
     desconto:disc, subtotal:sub, grand:sub*(1-disc/100),
-    grandFinal:items.reduce(function(a,i){ return a+(i.marg>0?i.totalFinal:i.total); },0)*(1-disc/100),
+    grandFinal:items.reduce(function(a,i){ return a+((i.marg>0&&i.totalFinal)?i.totalFinal:i.total); },0)*(1-disc/100),
     items:items };
 }
 
@@ -2631,18 +2655,20 @@ function gerarPdfPedido(){
 
   // Total global
   if(y+10>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=10; }
+  // Valor global: usa grandFinal (com margem) se disponível
+  var vgFinal=d.grandFinal||d.grand||0;
   setF(navy); doc.rect(mL,y,cW,8,'F');
   setF(navy2); doc.rect(mL,y,3,8,'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(10); setC(white);
   doc.text('VALOR GLOBAL = = = = = >', mL+5, y+5.5);
   doc.setFont('helvetica','bold'); doc.setFontSize(11); setC([200,235,255]);
-  doc.text('R$ '+fBpN(d.grand), W-mR-2, y+5.5, {align:'right'});
+  doc.text('R$ '+fBpN(vgFinal), W-mR-2, y+5.5, {align:'right'});
   y+=8;
   setF([232,241,252]); doc.rect(mL,y,cW,5.5,'F');
   setD(navy2); doc.setLineWidth(0.3);
   doc.line(mL,y,mL+cW,y); doc.line(mL,y+5.5,mL+cW,y+5.5);
   doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
-  doc.text('VALOR GLOBAL : = = = = = >   '+valorPorExtenso(d.grand).toUpperCase(),mL+2,y+3.8);
+  doc.text('VALOR GLOBAL : = = = = = >   '+valorPorExtenso(vgFinal).toUpperCase(),mL+2,y+3.8);
   y+=8;
 
   // Transportador
@@ -2704,28 +2730,24 @@ function gerarPdfPedido(){
   var colA=cW*0.46, colB=cW*0.46, gap=cW*0.08;
   var xA=mL, xB=mL+colA+gap;
 
-  // ── BLOCO ESQUERDO: Empresa fornecedora ──
-  // Fundo levemente colorido
+  // ── BLOCO ESQUERDO: Empresa fornecedora — linha azul + nome abaixo
   setF([240,246,255]); doc.roundedRect(xA,y,colA,36,2,2,'F');
   setD([180,205,230]); doc.setLineWidth(0.3); doc.roundedRect(xA,y,colA,36,2,2,'S');
-  setF(navy2); doc.rect(xA,y,3,36,'F'); // faixa esq
+  setF(navy2); doc.rect(xA,y,3,36,'F'); // faixa lateral azul
 
   // Label topo
-  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); setC([100,130,165]);
-  doc.text('FORNECEDOR', xA+6, y+4.5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); setC(navy2);
+  doc.text('FORNECEDOR', xA+6, y+5);
 
-  // Linha de assinatura
-  setD([150,175,205]); doc.setLineWidth(0.5);
-  doc.line(xA+6, y+18, xA+colA-6, y+18);
+  // Linha azul para assinar (igual ao verde do recebedor)
+  setD(navy2); doc.setLineWidth(0.8);
+  doc.line(xA+6, y+16, xA+colA-6, y+16);
 
-  // Nome empresa
+  // Nome empresa abaixo da linha (sem linha tracejada extra)
   doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setC(navy);
-  doc.text(EMPRESA.razaoSocial, xA+colA/2, y+23, {align:'center'});
+  doc.text(EMPRESA.razaoSocial, xA+colA/2, y+22, {align:'center'});
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
   doc.text('CNPJ: '+EMPRESA.cnpj, xA+colA/2, y+27.5, {align:'center'});
-
-  // Cargo/responsável
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(textSm);
   doc.text(d.vendedor||'Sócio Administrador', xA+colA/2, y+32, {align:'center'});
 
   // ── BLOCO DIREITO: Recebedor — igual à imagem
@@ -2738,14 +2760,17 @@ function gerarPdfPedido(){
   doc.text('RECEBIDO POR', xB+6, y+5);
 
   // APENAS a linha verde para assinar
-  setD([26,140,80]); doc.setLineWidth(0.6);
+  setD([26,140,80]); doc.setLineWidth(0.8);
   doc.line(xB+6, y+16, xB+colB-6, y+16);
 
- 
+  // Abaixo da linha: só Nome (sem segunda linha)
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
+  doc.text('Nome: _______________________________', xB+6, y+22);
+
   // CPF/CNPJ e Data na mesma linha
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(text_);
-  doc.text('CPF/CNPJ: ______________________', xB+6, y+27.5);
-  doc.text('Data: _________/_________/______', xB+6, y+32);
+  doc.text('CPF/CNPJ: ________________', xB+6, y+27.5);
+  doc.text('Data: ___/___/______', xB+6, y+32);
 
   // Nome do órgão bem pequeno no rodapé do bloco
   doc.setFont('helvetica','normal'); doc.setFontSize(6.5); setC([40,120,70]);

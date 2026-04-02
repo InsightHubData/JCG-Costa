@@ -2738,14 +2738,14 @@ function gerarPdfPedido(){
   doc.text('RECEBIDO POR', xB+6, y+5);
 
   // APENAS a linha verde para assinar
-  setD([26,140,80]); doc.setLineWidth(0.8);
+  setD([26,140,80]); doc.setLineWidth(0.6);
   doc.line(xB+6, y+16, xB+colB-6, y+16);
 
  
   // CPF/CNPJ e Data na mesma linha
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(text_);
-  doc.text('CPF/CNPJ: ________________', xB+6, y+27.5);
-  doc.text('Data: ___/___/______', xB+6, y+32);
+  doc.text('CPF/CNPJ: ______________________', xB+6, y+27.5);
+  doc.text('Data: _________/_________/______', xB+6, y+32);
 
   // Nome do órgão bem pequeno no rodapé do bloco
   doc.setFont('helvetica','normal'); doc.setFontSize(6.5); setC([40,120,70]);

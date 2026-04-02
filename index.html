@@ -2741,10 +2741,7 @@ function gerarPdfPedido(){
   setD([26,140,80]); doc.setLineWidth(0.8);
   doc.line(xB+6, y+16, xB+colB-6, y+16);
 
-  // Abaixo da linha: só Nome (sem segunda linha)
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
-  doc.text('Nome: _______________________________', xB+6, y+22);
-
+ 
   // CPF/CNPJ e Data na mesma linha
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); setC(text_);
   doc.text('CPF/CNPJ: ________________', xB+6, y+27.5);

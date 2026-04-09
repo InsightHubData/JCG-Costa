@@ -490,11 +490,26 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
           <select id="filtroGrupoProp" onchange="filtrarProdGrupoProp()" style="padding:5px 10px;border:1.5px solid var(--gray-bd);border-radius:6px;font-size:12px;background:#fff">
             <option value="">Todos os grupos</option>
             <option value="">Selecione o grupo...</option>
-<option value="A">🍎 Gênero Alimentício</option>
-<option value="L">🧹 Limpeza</option>
-<option value="H">🧴 Higiene</option>
-<option value="E">📋 Escritório</option>
-<option value="O">📦 Outros</option>
+<option value="GA">🍎 Gêneros Alimentícios</option>
+<option value="HL">🧹 Higiene e Limpeza</option>
+<option value="IF">💻 Informática</option>
+<option value="UC">🍳 Utensílios de Cozinha</option>
+<option value="ME">🪑 Móvel Escolar</option>
+<option value="MD">🪑 Móvel de Escritório</option>
+<option value="IM">🎵 Instrumentos Musicais</option>
+<option value="MATD">📚 Material Didático</option>
+<option value="MEXP">📎 Material de Expediente</option>
+<option value="MEL">💡 Material Elétrico</option>
+<option value="OL">🛢️ Óleo e Lubrificantes</option>
+<option value="PA">🚗 Peças de Automóvel</option>
+<option value="UE">👕 Uniformes Escolares</option>
+<option value="MC">🏗️ Material de Construção</option>
+<option value="MES">⚽ Material Esportivo</option>
+<option value="MP">📦 Material Permanente</option>
+<option value="MER">🍽️ Merenda Escolar</option>
+<option value="CB">🧺 Cesta Básica</option>
+<option value="EC">📋 Escritório</option>
+
           </select>
         </div>
         <div class="items-wrap">
@@ -888,11 +903,26 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
               <select id="filtroProdGrupo" onchange="renderCadLists()" style="width:100%;padding:4px 8px;border:1px solid var(--gray-bd);border-radius:5px;font-size:12px">
                 <option value="">Todos os grupos</option>
                 <option value="">Selecione o grupo...</option>
-<option value="A">🍎 Gênero Alimentício</option>
-<option value="L">🧹 Limpeza</option>
-<option value="H">🧴 Higiene</option>
-<option value="E">📋 Escritório</option>
-<option value="O">📦 Outros</option>
+<option value="GA">🍎 Gêneros Alimentícios</option>
+<option value="HL">🧹 Higiene e Limpeza</option>
+<option value="IF">💻 Informática</option>
+<option value="UC">🍳 Utensílios de Cozinha</option>
+<option value="ME">🪑 Móvel Escolar</option>
+<option value="MD">🪑 Móvel de Escritório</option>
+<option value="IM">🎵 Instrumentos Musicais</option>
+<option value="MATD">📚 Material Didático</option>
+<option value="MEXP">📎 Material de Expediente</option>
+<option value="MEL">💡 Material Elétrico</option>
+<option value="OL">🛢️ Óleo e Lubrificantes</option>
+<option value="PA">🚗 Peças de Automóvel</option>
+<option value="UE">👕 Uniformes Escolares</option>
+<option value="MC">🏗️ Material de Construção</option>
+<option value="MES">⚽ Material Esportivo</option>
+<option value="MP">📦 Material Permanente</option>
+<option value="MER">🍽️ Merenda Escolar</option>
+<option value="CB">🧺 Cesta Básica</option>
+<option value="EC">📋 Escritório</option>
+
               </select>
             </div>
             <div id="prodList" style="max-height:190px;overflow-y:auto;scrollbar-width:thin">
@@ -918,11 +948,26 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
       <div class="field"><label>Grupo <span class="req-star">★</span></label>
         <select id="editProdGrupo" onchange="onEditGrupoChange()">
           <option value="">Selecione o grupo...</option>
-<option value="A">🍎 Gênero Alimentício</option>
-<option value="L">🧹 Limpeza</option>
-<option value="H">🧴 Higiene</option>
-<option value="E">📋 Escritório</option>
-<option value="O">📦 Outros</option>
+<option value="GA">🍎 Gêneros Alimentícios</option>
+<option value="HL">🧹 Higiene e Limpeza</option>
+<option value="IF">💻 Informática</option>
+<option value="UC">🍳 Utensílios de Cozinha</option>
+<option value="ME">🪑 Móvel Escolar</option>
+<option value="MD">🪑 Móvel de Escritório</option>
+<option value="IM">🎵 Instrumentos Musicais</option>
+<option value="MATD">📚 Material Didático</option>
+<option value="MEXP">📎 Material de Expediente</option>
+<option value="MEL">💡 Material Elétrico</option>
+<option value="OL">🛢️ Óleo e Lubrificantes</option>
+<option value="PA">🚗 Peças de Automóvel</option>
+<option value="UE">👕 Uniformes Escolares</option>
+<option value="MC">🏗️ Material de Construção</option>
+<option value="MES">⚽ Material Esportivo</option>
+<option value="MP">📦 Material Permanente</option>
+<option value="MER">🍽️ Merenda Escolar</option>
+<option value="CB">🧺 Cesta Básica</option>
+<option value="EC">📋 Escritório</option>
+
         </select></div>
       <div class="field"><label>Código <span class="req-star">★</span></label>
         <input type="text" id="editProdCod" style="background:#e8f2fd;font-weight:700;color:var(--navy);letter-spacing:1px" oninput="editProdCod_validar()"></div>

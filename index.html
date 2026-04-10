@@ -374,58 +374,76 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
     try{ await deleteDoc(doc(db, tipo==='pedido'?'pedidos':'propostas', String(id))); }catch(e){}
   };
 
-  // ── CARREGAR TUDO DO BANCO ──
+  // ── ORDENAR histórico de forma segura (sem NaN) ──
+  function sortHist(arr){
+    return arr.sort((a,b)=>{
+      // 1º critério: campo data ISO (ex: "2026-03-30")
+      const da=String(a.data||''), db2=String(b.data||'');
+      if(da&&db2&&da!==db2) return db2.localeCompare(da);
+      // 2º critério: extrair número do id
+      const na=parseFloat(String(a.id||0).replace(/[^0-9]/g,''))||0;
+      const nb=parseFloat(String(b.id||0).replace(/[^0-9]/g,''))||0;
+      return nb-na;
+    });
+  }
+
+  // ── CARREGAR TUDO DO BANCO — Firebase é FONTE DE VERDADE ──
   window.fbLoadAll = async function(){
     window._fbReady = false;
     await ensureAuth();
     try{
-      // Clientes
+      // ── Clientes ──
       const cliSnap = await getDocs(collection(db,'clientes'));
-      const fc=[]; cliSnap.forEach(d=>fc.push(d.data()));
-      if(fc.length){ window.clients_=fc; localStorage.setItem('sn_cli2',JSON.stringify(fc)); }
+      const fc=[]; cliSnap.forEach(d=>{ const o=d.data(); if(o&&o.id) fc.push(o); });
+      // Sempre sobrescrever com dados do banco (fonte de verdade)
+      window.clients_ = fc.length ? fc : window.clients_;
+      localStorage.setItem('sn_cli2', JSON.stringify(window.clients_));
 
-      // Produtos
+      // ── Produtos ──
       const prodSnap = await getDocs(collection(db,'produtos'));
-      const fp=[]; prodSnap.forEach(d=>fp.push(d.data()));
-      if(fp.length){ window.products_=fp; localStorage.setItem('sn_prod2',JSON.stringify(fp)); }
+      const fp=[]; prodSnap.forEach(d=>{ const o=d.data(); if(o&&o.id) fp.push(o); });
+      window.products_ = fp.length ? fp : window.products_;
+      localStorage.setItem('sn_prod2', JSON.stringify(window.products_));
 
-      // Propostas + Pedidos
+      // ── Propostas + Pedidos — MESCLAR banco + local (evitar perder itens recentes) ──
       const propSnap = await getDocs(collection(db,'propostas'));
       const pedSnap  = await getDocs(collection(db,'pedidos'));
-      const fh=[];
-      propSnap.forEach(d=>{ const o=d.data(); o.tipo=o.tipo||'proposta'; fh.push(o); });
-      pedSnap.forEach(d=>{ const o=d.data(); o.tipo='pedido'; fh.push(o); });
+      const fhBanco=[];
+      propSnap.forEach(d=>{ const o=d.data(); if(o&&o.id){ o.tipo=o.tipo||'proposta'; fhBanco.push(o); }});
+      pedSnap.forEach(d=>{  const o=d.data(); if(o&&o.id){ o.tipo='pedido';            fhBanco.push(o); }});
 
-      if(fh.length){
-        // Ordenar por data decrescente — comparar campo data (string ISO) ou id numérico
-        fh.sort((a,b)=>{
-          // Pedidos: id é "ped_PED0001" (string), Propostas: id é número (Date.now())
-          const da = a.data||''; const db2 = b.data||'';
-          if(da&&db2) return db2.localeCompare(da); // mais recente primeiro
-          const na=parseFloat(String(a.id).replace(/\D/g,''))||0;
-          const nb=parseFloat(String(b.id).replace(/\D/g,''))||0;
-          return nb-na;
-        });
-        window.history_=fh;
-        localStorage.setItem('sn_hist2',JSON.stringify(fh));
-      }
+      // Índice dos ids já no banco
+      const idsNoBanco = new Set(fhBanco.map(h=>String(h.id)));
 
-      // Limpeza de registros > 45 dias
+      // Pegar itens do localStorage que AINDA NÃO estão no banco (salvos mas não sincronizados)
+      let localHist=[];
+      try{ localHist=JSON.parse(localStorage.getItem('sn_hist2')||'[]'); }catch(e){}
+      const soLocal = localHist.filter(h=>h&&h.id&&!idsNoBanco.has(String(h.id)));
+
+      // Combinar: banco + soLocal, sem duplicatas
+      const fhFinal = [...fhBanco, ...soLocal];
+      sortHist(fhFinal);
+
+      window.history_ = fhFinal;
+      localStorage.setItem('sn_hist2', JSON.stringify(fhFinal));
+
+      // ── Limpeza > 45 dias ──
       const limite = new Date(); limite.setDate(limite.getDate()-45);
       const limStr = limite.toISOString().split('T')[0];
-      ['propostas','pedidos'].forEach(async col=>{
+      for(const col of ['propostas','pedidos']){
         try{
           const snap=await getDocs(collection(db,col));
-          snap.forEach(async d=>{
+          for(const d of snap.docs){
             const dt=d.data().data||d.data().createdAt||'';
             if(dt&&dt<limStr) await deleteDoc(doc(db,col,d.id));
-          });
+          }
         }catch(e){}
-      });
+      }
 
     }catch(e){ console.warn('FB offline:', e.message); }
 
     window._fbReady=true;
+    // Renderizar tudo após carregar
     if(typeof renderCadLists==='function') renderCadLists();
     if(typeof renderHist==='function') renderHist();
     if(typeof initProdCodField==='function') initProdCodField();
@@ -2061,20 +2079,27 @@ async function generatePDF(){
   y=obsY0+obsH+7;
 
   // ── ASSINATURA ────────────────────────────────────────
-  if(y+24>H-18){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
+  var assinBloco=60; // altura total do bloco de assinatura
+  if(y+assinBloco>H-18){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
+
+  // Cidade e data
   var cidade_data=EMPRESA.cidade+' - ('+EMPRESA.uf+')., '+dataFmt;
   doc.setFont('helvetica','italic'); doc.setFontSize(9); setC(textSm);
   doc.text(cidade_data, W/2, y, {align:'center'});
-  y+=8;
-  setD(navy2); doc.setLineWidth(0.4);
-  doc.line(W/2-40,y,W/2+40,y);
-  y+=5;
+  y+=22; // espaço generoso antes da linha de assinatura
+
+  // Linha azul para assinatura (mais larga e elegante)
+  setD(navy2); doc.setLineWidth(0.6);
+  doc.line(W/2-55, y, W/2+55, y);
+  y+=6;
+
+  // Nome da empresa abaixo da linha
   doc.setFont('helvetica','bold'); doc.setFontSize(10); setC(navy);
   doc.text(EMPRESA.razaoSocial, W/2, y, {align:'center'});
-  y+=4.5;
+  y+=5;
   doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(textSm);
   doc.text('CNPJ Nº: '+EMPRESA.cnpj, W/2, y, {align:'center'});
-  y+=4;
+  y+=4.5;
   doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(textSm);
   doc.text(document.getElementById('fVendedor').value||'Sócio Administrador', W/2, y, {align:'center'});
 

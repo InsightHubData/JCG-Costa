@@ -320,7 +320,7 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
 
   window.fbSaveCliente   = async o=>{ try{ await setDoc(doc(db,'clientes',String(o.id)),o); }catch(e){} };
   window.fbDeleteCliente = async id=>{ try{ await deleteDoc(doc(db,'clientes',String(id))); }catch(e){} };
-  window.fbSaveProduto   = async o=>{ try{ await setDoc(doc(db,'produtos',String(o.id)),o); }catch(e){} };
+  window.fbSaveProduto   = async o=>{ try{ await setDoc(doc(db,'produtos',String(o.id)),o); console.log('FB produto salvo:',o.cod||o.id); }catch(e){ console.error('FB produto erro:',e.message); } };
   window.fbDeleteProduto = async id=>{ try{ await deleteDoc(doc(db,'produtos',String(id))); }catch(e){} };
   window.fbSaveProposta  = async o=>{ try{ await setDoc(doc(db,'propostas',String(o.id)),o); console.log('FB proposta salva:',o.num||o.id); }catch(e){ console.error('FB proposta erro:',e.message,o.id); } };
   window.fbSavePedido    = async o=>{ try{ await setDoc(doc(db,'pedidos',String(o.id)),o); console.log('FB pedido salvo:',o.num||o.id); }catch(e){ console.error('FB pedido erro:',e.message,o.id); } };
@@ -1131,31 +1131,35 @@ function comprimirBase64(base64, qualidade, cb){
 
 function fbSalvarHistItem(h){
   if(!h||!h.id) return;
+  // Garantir tipo definido
+  if(!h.tipo) h.tipo='proposta';
   var hFb=JSON.parse(JSON.stringify(h));
-  // Se não tiver itens com imagem, salva direto
-  var temImg=(hFb.items||[]).some(function(it){ return it.img&&it.img.length>500; });
-  if(!temImg){
-    if(h.tipo==='pedido'){ if(typeof window.fbSavePedido==='function') window.fbSavePedido(hFb); }
-    else { if(typeof window.fbSaveProposta==='function') window.fbSaveProposta(hFb); }
-    return;
+  // Garantir que tipo está no objeto salvo
+  hFb.tipo=h.tipo;
+
+  function _doSave(obj){
+    if(obj.tipo==='pedido'){
+      if(typeof window.fbSavePedido==='function') window.fbSavePedido(obj);
+      else setTimeout(function(){ if(typeof window.fbSavePedido==='function') window.fbSavePedido(obj); },2000);
+    } else {
+      if(typeof window.fbSaveProposta==='function') window.fbSaveProposta(obj);
+      else setTimeout(function(){ if(typeof window.fbSaveProposta==='function') window.fbSaveProposta(obj); },2000);
+    }
   }
-  // Comprimir imagens dos itens antes de enviar
+
+  var temImg=(hFb.items||[]).some(function(it){ return it.img&&it.img.length>500; });
+  if(!temImg){ _doSave(hFb); return; }
+
+  // Comprimir imagens dos itens
   var itens=hFb.items||[];
   var pendentes=itens.filter(function(it){ return it.img&&it.img.length>500; }).length;
-  if(pendentes===0){
-    if(h.tipo==='pedido'){ if(typeof window.fbSavePedido==='function') window.fbSavePedido(hFb); }
-    else { if(typeof window.fbSaveProposta==='function') window.fbSaveProposta(hFb); }
-    return;
-  }
+  if(pendentes===0){ _doSave(hFb); return; }
   itens.forEach(function(it, idx){
     if(it.img&&it.img.length>500){
       comprimirBase64(it.img, 0.35, function(imgComp){
         hFb.items[idx].img=imgComp;
         pendentes--;
-        if(pendentes===0){
-          if(h.tipo==='pedido'){ if(typeof window.fbSavePedido==='function') window.fbSavePedido(hFb); }
-          else { if(typeof window.fbSaveProposta==='function') window.fbSaveProposta(hFb); }
-        }
+        if(pendentes===0) _doSave(hFb);
       });
     }
   });
@@ -2155,7 +2159,10 @@ function renderHist(){
   });
 }
 
-function updStatus(id,val){ var idx=history_.findIndex(function(h){ return h.id===id; }); if(idx>=0){ history_[idx].status=val; saveLS(); renderHist(); } }
+function updStatus(id,val){
+  var idx=history_.findIndex(function(h){ return String(h.id)===String(id); });
+  if(idx>=0){ history_[idx].status=val; saveLS(history_[idx]); renderHist(); }
+}
 function _resolveHid(arg){ if(arg&&arg.dataset) return arg.dataset.hid; return arg; }
 function _findHist(raw){ return history_.find(function(x){ return String(x.id)===String(raw); })||null; }
 
@@ -2312,13 +2319,13 @@ function cadProdCod_validar(){
 // Ao mudar grupo no editar — regera o código no novo grupo
 function onEditGrupoChange(){
   var grupo=(document.getElementById('editProdGrupo').value||'').trim();
-  var id=parseInt(document.getElementById('editProdId').value);
+  var idEd=document.getElementById('editProdId').value;
   if(!grupo) return;
   // Código: próximo disponível neste grupo excluindo o próprio produto
   var usados=products_.map(function(p){ return p.cod||''; })
     .filter(function(cd){
       var px=products_.find(function(x){ return x.cod===cd; });
-      return px && px.id!==id &&
+      return px && String(px.id)!==String(idEd) &&
              cd.toUpperCase().indexOf(grupo.toUpperCase())===0 &&
              !isNaN(parseInt(cd.substring(grupo.length)));
     })
@@ -2407,21 +2414,18 @@ function renderCadLists(){
 }
 
 function delClient(id){ if(!confirm('Excluir?')) return; clients_=clients_.filter(function(c){ return c.id!==id; }); saveLSCli(); renderCadLists(); }
-function delProduct(id){ if(!confirm('Excluir?')) return; products_=products_.filter(function(p){ return p.id!==id; }); saveLSProd(); renderCadLists(); }
+function delProduct(id){ if(!confirm('Excluir?')) return; products_=products_.filter(function(p){ return String(p.id)!==String(id); }); saveLSProd(); renderCadLists(); }
 
 /* ═══════════════════════════════════════
    MODAIS EDITAR
 ═══════════════════════════════════════ */
 function openEditProduct(id){
-  var p=products_.find(function(x){ return x.id===id; }); if(!p) return;
-  document.getElementById('editProdId').value=id;
+  // Comparar como string para compatibilidade (onclick passa string, Date.now() é número)
+  var p=products_.find(function(x){ return String(x.id)===String(id); }); if(!p) return;
+  document.getElementById('editProdId').value=p.id; // salvar o id original do produto
   document.getElementById('editProdCod').value=p.cod||'';
   var epg=document.getElementById('editProdGrupo');
-  if(epg){
-    // Detectar grupo pelo prefixo do código se grupo não estiver salvo
-    var gDetect=p.grupo||Object.keys(GRUPO_PREFIXO).find(function(k){ return GRUPO_PREFIXO[k]===(p.cod||'P').charAt(0); })||'';
-    epg.value=gDetect;
-  }
+  if(epg){ epg.value=p.grupo||''; } // apenas o grupo salvo, sem auto-detectar
   document.getElementById('editProdNome').value=p.nome||'';
   document.getElementById('editProdDesc').value=p.desc||'';
   document.getElementById('editProdUn').value=p.un||'';
@@ -2439,12 +2443,13 @@ function closeProdModal(e){ if(e&&e.target!==document.getElementById('prodModalO
 function loadEditProdImg(input){ var file=input.files[0]; if(!file) return; var r=new FileReader(); r.onload=function(ev){ window._editProdImg=ev.target.result; document.getElementById('editProdImgPreview').src=ev.target.result; document.getElementById('editProdImgPreview').style.display='block'; document.getElementById('editProdImgPh').style.display='none'; document.getElementById('editProdImgDel').style.display='inline'; }; r.readAsDataURL(file); }
 function clearEditProdImg(){ window._editProdImg=null; document.getElementById('editProdImgPreview').style.display='none'; document.getElementById('editProdImgPh').style.display='flex'; document.getElementById('editProdImgDel').style.display='none'; document.getElementById('editProdImgInput').value=''; }
 function saveEditProduct(){
-  var id=parseInt(document.getElementById('editProdId').value);
+  var idRaw=document.getElementById('editProdId').value;
   var nome=(document.getElementById('editProdNome').value||'').trim();
   var cod=(document.getElementById('editProdCod').value||'').trim().toUpperCase();
   if(!nome||!cod){ toast('Preencha nome e código.','err'); return; }
-  var idx=products_.findIndex(function(x){ return x.id===id; }); if(idx<0) return;
-  var dup=products_.findIndex(function(x){ return x.id!==id&&(x.cod||'').toUpperCase()===cod; });
+  var idx=products_.findIndex(function(x){ return String(x.id)===String(idRaw); }); if(idx<0) return;
+  var id=products_[idx].id; // id original (pode ser número ou string)
+  var dup=products_.findIndex(function(x){ return String(x.id)!==String(idRaw)&&(x.cod||'').toUpperCase()===cod; });
   if(dup>=0){ toast('Código "'+cod+'" já existe.','err'); return; }
   var grupoEdit=(document.getElementById('editProdGrupo').value||'').trim();
   products_[idx]={ id:products_[idx].id, cod:cod, nome:nome, grupo:grupoEdit,
@@ -2452,7 +2457,10 @@ function saveEditProduct(){
     un:(document.getElementById('editProdUn').value||'').trim(), marca:(document.getElementById('editProdMarca').value||'').trim(),
     fabricante:(document.getElementById('editProdFabricante').value||'').trim(),
     preco:parseFloat(document.getElementById('editProdPreco').value)||0, img:window._editProdImg||null };
-  saveLSProd(); renderCadLists(); document.getElementById('prodModalOv').classList.remove('open'); toast('Produto atualizado!','ok');
+  saveLSProd();
+  // Salvar este produto específico no Firebase imediatamente
+  if(typeof window.fbSaveProduto==='function') window.fbSaveProduto(products_[idx]);
+  renderCadLists(); document.getElementById('prodModalOv').classList.remove('open'); toast('Produto '+cod+' atualizado!','ok');
 }
 
 function openEditClient(id){
@@ -2512,8 +2520,12 @@ function renderProdListModal(filter){
     body.appendChild(d);
   });
 }
-function openEditFromModal(id){ document.getElementById('prodListModalOv').classList.remove('open'); openEditProduct(id); }
-function delFromModal(id){ if(!confirm('Excluir?')) return; products_=products_.filter(function(p){ return p.id!==id; }); saveLSProd(); renderCadLists(); renderProdListModal(document.getElementById('prodListSearch').value); }
+function openEditFromModal(id){ document.getElementById('prodListModalOv').classList.remove('open'); openEditProduct(String(id)); }
+function delFromModal(id){ if(!confirm('Excluir?')) return;
+  var p=products_.find(function(x){ return String(x.id)===String(id); });
+  products_=products_.filter(function(x){ return String(x.id)!==String(id); });
+  if(p&&typeof window.fbDeleteProduto==='function') window.fbDeleteProduto(p.id);
+  saveLSProd(); renderCadLists(); renderProdListModal(document.getElementById('prodListSearch').value); }
 
 function openCliListModal(){
   document.getElementById('cliListSearch').value='';

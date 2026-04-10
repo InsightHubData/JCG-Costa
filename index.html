@@ -299,7 +299,8 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
 <!-- FIREBASE -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, enableIndexedDbPersistence }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const firebaseConfig = {
@@ -310,51 +311,127 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
     messagingSenderId: "54037507196",
     appId: "1:54037507196:web:ce348fb82431c7fce72df9"
   };
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
+
+  const app  = initializeApp(firebaseConfig);
+  const db   = getFirestore(app);
   const auth = getAuth(app);
   const FB_EMAIL = 'app.jcgcosta@gmail.com';
   const FB_PASS  = 'JCGCosta@2025!';
 
-  async function fbSignIn(){ try{ await signInWithEmailAndPassword(auth,FB_EMAIL,FB_PASS); }catch(e){ console.warn('FB auth:',e.message); } }
-
-  window.fbSaveCliente   = async o=>{ try{ await setDoc(doc(db,'clientes',String(o.id)),o); }catch(e){} };
-  window.fbDeleteCliente = async id=>{ try{ await deleteDoc(doc(db,'clientes',String(id))); }catch(e){} };
-  window.fbSaveProduto   = async o=>{ try{ await setDoc(doc(db,'produtos',String(o.id)),o); console.log('FB produto salvo:',o.cod||o.id); }catch(e){ console.error('FB produto erro:',e.message); } };
-  window.fbDeleteProduto = async id=>{ try{ await deleteDoc(doc(db,'produtos',String(id))); }catch(e){} };
-  window.fbSaveProposta  = async o=>{ try{ await setDoc(doc(db,'propostas',String(o.id)),o); console.log('FB proposta salva:',o.num||o.id); }catch(e){ console.error('FB proposta erro:',e.message,o.id); } };
-  window.fbSavePedido    = async o=>{ try{ await setDoc(doc(db,'pedidos',String(o.id)),o); console.log('FB pedido salvo:',o.num||o.id); }catch(e){ console.error('FB pedido erro:',e.message,o.id); } };
-  window.fbDeleteHist    = async (id,tipo)=>{ try{ await deleteDoc(doc(db,tipo==='pedido'?'pedidos':'propostas',String(id))); }catch(e){} };
-
-  async function cleanOld(col){
-    var c=new Date(); c.setDate(c.getDate()-45);
-    var cs=c.toISOString().split('T')[0];
-    try{ var s=await getDocs(collection(db,col));
-      s.forEach(async d=>{ var dt=d.data().data||d.data().createdAt||''; if(dt&&dt<cs) await deleteDoc(doc(db,col,d.id)); });
-    }catch(e){}
+  // Garante autenticação antes de qualquer operação
+  async function ensureAuth(){
+    if(!auth.currentUser){
+      try{ await signInWithEmailAndPassword(auth,FB_EMAIL,FB_PASS); }catch(e){ console.warn('FB auth:',e.message); }
+    }
   }
 
-  window.fbLoadAll = async function(){
-    window._fbReady=false;
-    if(!auth.currentUser) await fbSignIn();
+  // ── CLIENTES ──
+  window.fbSaveCliente   = async o=>{ await ensureAuth(); try{ await setDoc(doc(db,'clientes',String(o.id)),o); }catch(e){ console.error('fbSaveCliente:',e.code,e.message); } };
+  window.fbDeleteCliente = async id=>{ await ensureAuth(); try{ await deleteDoc(doc(db,'clientes',String(id))); }catch(e){} };
+
+  // ── PRODUTOS — salva UM produto, com retry se não autenticado ──
+  window.fbSaveProduto = async function(o){
+    await ensureAuth();
+    // Sanitizar: remover campos undefined
+    const safe = JSON.parse(JSON.stringify(o));
     try{
-      var cs=await getDocs(collection(db,'clientes')); var fc=[];
-      cs.forEach(d=>fc.push(d.data())); if(fc.length){ window.clients_=fc; localStorage.setItem('sn_cli2',JSON.stringify(fc)); }
-      var ps=await getDocs(collection(db,'produtos')); var fp=[];
-      ps.forEach(d=>fp.push(d.data())); if(fp.length){ window.products_=fp; localStorage.setItem('sn_prod2',JSON.stringify(fp)); }
-      var prs=await getDocs(collection(db,'propostas')); var pds=await getDocs(collection(db,'pedidos')); var fh=[];
-      prs.forEach(d=>{ var o=d.data(); o.tipo=o.tipo||'proposta'; fh.push(o); });
-      pds.forEach(d=>{ var o=d.data(); o.tipo='pedido'; fh.push(o); });
-      if(fh.length){ fh.sort((a,b)=>(b.id||0)-(a.id||0)); window.history_=fh; localStorage.setItem('sn_hist2',JSON.stringify(fh)); }
-      cleanOld('propostas'); cleanOld('pedidos');
-    }catch(e){ console.warn('FB offline:',e.message); }
+      await setDoc(doc(db,'produtos',String(safe.id)), safe);
+      console.log('✅ Produto salvo:', safe.cod||safe.id);
+    }catch(e){
+      console.error('❌ fbSaveProduto:', e.code, e.message, safe.id);
+    }
+  };
+  window.fbDeleteProduto = async id=>{ await ensureAuth(); try{ await deleteDoc(doc(db,'produtos',String(id))); }catch(e){} };
+
+  // ── PROPOSTAS ──
+  window.fbSaveProposta = async function(o){
+    await ensureAuth();
+    const safe = JSON.parse(JSON.stringify(o));
+    safe.tipo = safe.tipo||'proposta';
+    try{
+      await setDoc(doc(db,'propostas',String(safe.id)), safe);
+      console.log('✅ Proposta salva:', safe.num||safe.id);
+    }catch(e){
+      console.error('❌ fbSaveProposta:', e.code, e.message, safe.id);
+    }
+  };
+
+  // ── PEDIDOS ──
+  window.fbSavePedido = async function(o){
+    await ensureAuth();
+    const safe = JSON.parse(JSON.stringify(o));
+    safe.tipo = 'pedido';
+    try{
+      await setDoc(doc(db,'pedidos',String(safe.id)), safe);
+      console.log('✅ Pedido salvo:', safe.num||safe.id);
+    }catch(e){
+      console.error('❌ fbSavePedido:', e.code, e.message, safe.id);
+    }
+  };
+
+  window.fbDeleteHist = async (id,tipo)=>{
+    await ensureAuth();
+    try{ await deleteDoc(doc(db, tipo==='pedido'?'pedidos':'propostas', String(id))); }catch(e){}
+  };
+
+  // ── CARREGAR TUDO DO BANCO ──
+  window.fbLoadAll = async function(){
+    window._fbReady = false;
+    await ensureAuth();
+    try{
+      // Clientes
+      const cliSnap = await getDocs(collection(db,'clientes'));
+      const fc=[]; cliSnap.forEach(d=>fc.push(d.data()));
+      if(fc.length){ window.clients_=fc; localStorage.setItem('sn_cli2',JSON.stringify(fc)); }
+
+      // Produtos
+      const prodSnap = await getDocs(collection(db,'produtos'));
+      const fp=[]; prodSnap.forEach(d=>fp.push(d.data()));
+      if(fp.length){ window.products_=fp; localStorage.setItem('sn_prod2',JSON.stringify(fp)); }
+
+      // Propostas + Pedidos
+      const propSnap = await getDocs(collection(db,'propostas'));
+      const pedSnap  = await getDocs(collection(db,'pedidos'));
+      const fh=[];
+      propSnap.forEach(d=>{ const o=d.data(); o.tipo=o.tipo||'proposta'; fh.push(o); });
+      pedSnap.forEach(d=>{ const o=d.data(); o.tipo='pedido'; fh.push(o); });
+
+      if(fh.length){
+        // Ordenar por data decrescente — comparar campo data (string ISO) ou id numérico
+        fh.sort((a,b)=>{
+          // Pedidos: id é "ped_PED0001" (string), Propostas: id é número (Date.now())
+          const da = a.data||''; const db2 = b.data||'';
+          if(da&&db2) return db2.localeCompare(da); // mais recente primeiro
+          const na=parseFloat(String(a.id).replace(/\D/g,''))||0;
+          const nb=parseFloat(String(b.id).replace(/\D/g,''))||0;
+          return nb-na;
+        });
+        window.history_=fh;
+        localStorage.setItem('sn_hist2',JSON.stringify(fh));
+      }
+
+      // Limpeza de registros > 45 dias
+      const limite = new Date(); limite.setDate(limite.getDate()-45);
+      const limStr = limite.toISOString().split('T')[0];
+      ['propostas','pedidos'].forEach(async col=>{
+        try{
+          const snap=await getDocs(collection(db,col));
+          snap.forEach(async d=>{
+            const dt=d.data().data||d.data().createdAt||'';
+            if(dt&&dt<limStr) await deleteDoc(doc(db,col,d.id));
+          });
+        }catch(e){}
+      });
+
+    }catch(e){ console.warn('FB offline:', e.message); }
+
     window._fbReady=true;
     if(typeof renderCadLists==='function') renderCadLists();
     if(typeof renderHist==='function') renderHist();
     if(typeof initProdCodField==='function') initProdCodField();
   };
 
-  document.addEventListener('DOMContentLoaded',()=>{ fbSignIn().then(()=>window.fbLoadAll()); });
+  document.addEventListener('DOMContentLoaded',()=>{ window.fbLoadAll(); });
 </script>
 </head>
 <body>
@@ -1175,8 +1252,14 @@ function saveLSCli(){
   clients_.forEach(function(c){ if(c&&c.id&&typeof window.fbSaveCliente==='function') window.fbSaveCliente(c); });
 }
 function saveLSProd(){
+  // Salva apenas no localStorage — Firebase é chamado individualmente ao salvar/editar
   try{ localStorage.setItem('sn_prod2', JSON.stringify(products_)); } catch(e){}
-  products_.forEach(function(p){ if(p&&p.id&&typeof window.fbSaveProduto==='function') window.fbSaveProduto(p); });
+}
+// Salvar produto específico no Firebase (chamado explicitamente após save/edit)
+function fbProdutoSalvar(p){
+  if(!p||!p.id) return;
+  if(typeof window.fbSaveProduto==='function') window.fbSaveProduto(p);
+  else setTimeout(function(){ if(typeof window.fbSaveProduto==='function') window.fbSaveProduto(p); },1500);
 }
 
 /* ═══════════════════════════════════════
@@ -2370,7 +2453,11 @@ function saveProduct(){
     img:cadImg
   });
   window._cadProdImg=null;
-  saveLSProd(); renderCadLists(); initProdCodField();
+  saveLSProd();
+  // Salvar novo produto no Firebase
+  var novoProd=products_[products_.length-1];
+  fbProdutoSalvar(novoProd);
+  renderCadLists(); initProdCodField();
   ['cadProdNome','cadProdDesc','cadProdUn','cadProdMarca','cadProdFabricante','cadProdPreco'].forEach(function(i){ document.getElementById(i).value=''; });
   clearCadProdImg();
   toast('Produto '+cod+' salvo!','ok');
@@ -2459,7 +2546,7 @@ function saveEditProduct(){
     preco:parseFloat(document.getElementById('editProdPreco').value)||0, img:window._editProdImg||null };
   saveLSProd();
   // Salvar este produto específico no Firebase imediatamente
-  if(typeof window.fbSaveProduto==='function') window.fbSaveProduto(products_[idx]);
+  fbProdutoSalvar(products_[idx]);
   renderCadLists(); document.getElementById('prodModalOv').classList.remove('open'); toast('Produto '+cod+' atualizado!','ok');
 }
 

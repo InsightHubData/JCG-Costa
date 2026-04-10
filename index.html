@@ -350,9 +350,11 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
     safe.tipo = safe.tipo||'proposta';
     try{
       await setDoc(doc(db,'propostas',String(safe.id)), safe);
-      console.log('✅ Proposta salva:', safe.num||safe.id);
+      console.log('✅ Proposta salva no banco:', safe.num||safe.id);
+      return true;
     }catch(e){
       console.error('❌ fbSaveProposta:', e.code, e.message, safe.id);
+      return false;
     }
   };
 
@@ -363,9 +365,11 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
     safe.tipo = 'pedido';
     try{
       await setDoc(doc(db,'pedidos',String(safe.id)), safe);
-      console.log('✅ Pedido salvo:', safe.num||safe.id);
+      console.log('✅ Pedido salvo no banco:', safe.num||safe.id);
+      return true;
     }catch(e){
       console.error('❌ fbSavePedido:', e.code, e.message, safe.id);
+      return false;
     }
   };
 
@@ -374,76 +378,59 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
     try{ await deleteDoc(doc(db, tipo==='pedido'?'pedidos':'propostas', String(id))); }catch(e){}
   };
 
-  // ── ORDENAR histórico de forma segura (sem NaN) ──
+  // ── Ordenar histórico sem NaN ──
   function sortHist(arr){
     return arr.sort((a,b)=>{
-      // 1º critério: campo data ISO (ex: "2026-03-30")
       const da=String(a.data||''), db2=String(b.data||'');
       if(da&&db2&&da!==db2) return db2.localeCompare(da);
-      // 2º critério: extrair número do id
       const na=parseFloat(String(a.id||0).replace(/[^0-9]/g,''))||0;
       const nb=parseFloat(String(b.id||0).replace(/[^0-9]/g,''))||0;
       return nb-na;
     });
   }
 
-  // ── CARREGAR TUDO DO BANCO — Firebase é FONTE DE VERDADE ──
+  // ── CARREGAR TUDO DO BANCO — Firebase é a única fonte de verdade ──
   window.fbLoadAll = async function(){
     window._fbReady = false;
     await ensureAuth();
     try{
-      // ── Clientes ──
+      // Clientes
       const cliSnap = await getDocs(collection(db,'clientes'));
       const fc=[]; cliSnap.forEach(d=>{ const o=d.data(); if(o&&o.id) fc.push(o); });
-      // Sempre sobrescrever com dados do banco (fonte de verdade)
-      window.clients_ = fc.length ? fc : window.clients_;
-      localStorage.setItem('sn_cli2', JSON.stringify(window.clients_));
+      if(fc.length){ window.clients_=fc; localStorage.setItem('sn_cli2',JSON.stringify(fc)); }
 
-      // ── Produtos ──
+      // Produtos
       const prodSnap = await getDocs(collection(db,'produtos'));
       const fp=[]; prodSnap.forEach(d=>{ const o=d.data(); if(o&&o.id) fp.push(o); });
-      window.products_ = fp.length ? fp : window.products_;
-      localStorage.setItem('sn_prod2', JSON.stringify(window.products_));
+      if(fp.length){ window.products_=fp; localStorage.setItem('sn_prod2',JSON.stringify(fp)); }
 
-      // ── Propostas + Pedidos — MESCLAR banco + local (evitar perder itens recentes) ──
-      const propSnap = await getDocs(collection(db,'propostas'));
-      const pedSnap  = await getDocs(collection(db,'pedidos'));
-      const fhBanco=[];
-      propSnap.forEach(d=>{ const o=d.data(); if(o&&o.id){ o.tipo=o.tipo||'proposta'; fhBanco.push(o); }});
-      pedSnap.forEach(d=>{  const o=d.data(); if(o&&o.id){ o.tipo='pedido';            fhBanco.push(o); }});
+      // Propostas + Pedidos — SEMPRE usar banco como fonte de verdade
+      const [propSnap, pedSnap] = await Promise.all([
+        getDocs(collection(db,'propostas')),
+        getDocs(collection(db,'pedidos'))
+      ]);
+      const fh=[];
+      propSnap.forEach(d=>{ const o=d.data(); if(o&&o.id){ o.tipo=o.tipo||'proposta'; fh.push(o); }});
+      pedSnap.forEach(d=>{  const o=d.data(); if(o&&o.id){ o.tipo='pedido'; fh.push(o); }});
+      sortHist(fh);
+      // Sempre sobrescrever — Firebase manda
+      window.history_ = fh;
+      localStorage.setItem('sn_hist2', JSON.stringify(fh));
 
-      // Índice dos ids já no banco
-      const idsNoBanco = new Set(fhBanco.map(h=>String(h.id)));
-
-      // Pegar itens do localStorage que AINDA NÃO estão no banco (salvos mas não sincronizados)
-      let localHist=[];
-      try{ localHist=JSON.parse(localStorage.getItem('sn_hist2')||'[]'); }catch(e){}
-      const soLocal = localHist.filter(h=>h&&h.id&&!idsNoBanco.has(String(h.id)));
-
-      // Combinar: banco + soLocal, sem duplicatas
-      const fhFinal = [...fhBanco, ...soLocal];
-      sortHist(fhFinal);
-
-      window.history_ = fhFinal;
-      localStorage.setItem('sn_hist2', JSON.stringify(fhFinal));
-
-      // ── Limpeza > 45 dias ──
-      const limite = new Date(); limite.setDate(limite.getDate()-45);
-      const limStr = limite.toISOString().split('T')[0];
+      // Limpeza > 45 dias (em background)
+      const limStr = new Date(Date.now()-45*864e5).toISOString().split('T')[0];
       for(const col of ['propostas','pedidos']){
         try{
           const snap=await getDocs(collection(db,col));
           for(const d of snap.docs){
             const dt=d.data().data||d.data().createdAt||'';
-            if(dt&&dt<limStr) await deleteDoc(doc(db,col,d.id));
+            if(dt&&dt<limStr) deleteDoc(doc(db,col,d.id));
           }
         }catch(e){}
       }
-
     }catch(e){ console.warn('FB offline:', e.message); }
 
     window._fbReady=true;
-    // Renderizar tudo após carregar
     if(typeof renderCadLists==='function') renderCadLists();
     if(typeof renderHist==='function') renderHist();
     if(typeof initProdCodField==='function') initProdCodField();
@@ -1226,32 +1213,34 @@ function comprimirBase64(base64, qualidade, cb){
 
 function fbSalvarHistItem(h){
   if(!h||!h.id) return;
-  // Garantir tipo definido
   if(!h.tipo) h.tipo='proposta';
   var hFb=JSON.parse(JSON.stringify(h));
-  // Garantir que tipo está no objeto salvo
   hFb.tipo=h.tipo;
 
   function _doSave(obj){
-    if(obj.tipo==='pedido'){
-      if(typeof window.fbSavePedido==='function') window.fbSavePedido(obj);
-      else setTimeout(function(){ if(typeof window.fbSavePedido==='function') window.fbSavePedido(obj); },2000);
+    var fn=obj.tipo==='pedido'?window.fbSavePedido:window.fbSaveProposta;
+    if(typeof fn==='function'){
+      fn(obj).then(function(ok){
+        if(ok) console.log('✅ Hist salvo no banco:', obj.num||obj.id);
+        else    console.warn('⚠️ Hist falhou no banco:', obj.num||obj.id);
+      });
     } else {
-      if(typeof window.fbSaveProposta==='function') window.fbSaveProposta(obj);
-      else setTimeout(function(){ if(typeof window.fbSaveProposta==='function') window.fbSaveProposta(obj); },2000);
+      // Firebase ainda carregando — tenta em 2s
+      setTimeout(function(){
+        var fn2=obj.tipo==='pedido'?window.fbSavePedido:window.fbSaveProposta;
+        if(typeof fn2==='function') fn2(obj);
+      }, 2000);
     }
   }
 
-  var temImg=(hFb.items||[]).some(function(it){ return it.img&&it.img.length>500; });
-  if(!temImg){ _doSave(hFb); return; }
-
-  // Comprimir imagens dos itens
   var itens=hFb.items||[];
-  var pendentes=itens.filter(function(it){ return it.img&&it.img.length>500; }).length;
-  if(pendentes===0){ _doSave(hFb); return; }
-  itens.forEach(function(it, idx){
+  var comImg=itens.filter(function(it){ return it.img&&it.img.length>500; });
+  if(!comImg.length){ _doSave(hFb); return; }
+
+  var pendentes=comImg.length;
+  itens.forEach(function(it,idx){
     if(it.img&&it.img.length>500){
-      comprimirBase64(it.img, 0.35, function(imgComp){
+      comprimirBase64(it.img,0.35,function(imgComp){
         hFb.items[idx].img=imgComp;
         pendentes--;
         if(pendentes===0) _doSave(hFb);
@@ -1261,9 +1250,14 @@ function fbSalvarHistItem(h){
 }
 
 function saveLS(itemEspecifico){
+  // 1) Atualizar localStorage imediatamente (cache local)
   try{ localStorage.setItem('sn_hist2', JSON.stringify(history_)); } catch(e){}
-  var lista=itemEspecifico?[itemEspecifico]:history_;
-  lista.forEach(function(h){ fbSalvarHistItem(h); });
+  // 2) Salvar no Firebase — só o item que mudou (eficiente)
+  if(itemEspecifico){
+    fbSalvarHistItem(itemEspecifico);
+  }
+  // Nota: saveLS() sem argumento apenas atualiza o localStorage
+  // O Firebase é sempre chamado item a item via fbSalvarHistItem
 }
 function saveLSCli(){
   try{ localStorage.setItem('sn_cli2', JSON.stringify(clients_)); } catch(e){}

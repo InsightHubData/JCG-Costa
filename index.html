@@ -397,14 +397,15 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
       // Clientes
       const cliSnap = await getDocs(collection(db,'clientes'));
       const fc=[]; cliSnap.forEach(d=>{ const o=d.data(); if(o&&o.id) fc.push(o); });
-      if(fc.length){ window.clients_=fc; localStorage.setItem('sn_cli2',JSON.stringify(fc)); }
+      // Usar setter para atualizar variável local do script principal
+      if(fc.length && typeof window._setClients==='function') window._setClients(fc);
 
       // Produtos
       const prodSnap = await getDocs(collection(db,'produtos'));
       const fp=[]; prodSnap.forEach(d=>{ const o=d.data(); if(o&&o.id) fp.push(o); });
-      if(fp.length){ window.products_=fp; localStorage.setItem('sn_prod2',JSON.stringify(fp)); }
+      if(fp.length && typeof window._setProducts==='function') window._setProducts(fp);
 
-      // Propostas + Pedidos — SEMPRE usar banco como fonte de verdade
+      // Propostas + Pedidos
       const [propSnap, pedSnap] = await Promise.all([
         getDocs(collection(db,'propostas')),
         getDocs(collection(db,'pedidos'))
@@ -413,9 +414,8 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
       propSnap.forEach(d=>{ const o=d.data(); if(o&&o.id){ o.tipo=o.tipo||'proposta'; fh.push(o); }});
       pedSnap.forEach(d=>{  const o=d.data(); if(o&&o.id){ o.tipo='pedido'; fh.push(o); }});
       sortHist(fh);
-      // Sempre sobrescrever — Firebase manda
-      window.history_ = fh;
-      localStorage.setItem('sn_hist2', JSON.stringify(fh));
+      // Chamar setter — atualiza history_ local E renderiza o front
+      if(typeof window._setHistory==='function') window._setHistory(fh);
 
       // Limpeza > 45 dias (em background)
       const limStr = new Date(Date.now()-45*864e5).toISOString().split('T')[0];
@@ -431,8 +431,7 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
     }catch(e){ console.warn('FB offline:', e.message); }
 
     window._fbReady=true;
-    if(typeof renderCadLists==='function') renderCadLists();
-    if(typeof renderHist==='function') renderHist();
+    // renderHist e renderCadLists já foram chamados pelos setters acima
     if(typeof initProdCodField==='function') initProdCodField();
   };
 
@@ -1185,9 +1184,14 @@ var history_  = [];
 var clients_  = [];
 var products_ = [];
 
-try { history_  = JSON.parse(localStorage.getItem('sn_hist2')  || '[]'); } catch(e){ history_=[]; }
-try { clients_  = JSON.parse(localStorage.getItem('sn_cli2')   || '[]'); } catch(e){ clients_=[]; }
-try { products_ = JSON.parse(localStorage.getItem('sn_prod2')  || '[]'); } catch(e){ products_=[]; }
+// NÃO carregar do localStorage — Firebase é a fonte de verdade
+// localStorage é usado apenas como cache de escrita
+
+// Setters expostos via window para o módulo Firebase poder atualizar
+// as variáveis locais deste script (escopos diferentes!)
+window._setHistory  = function(arr){ history_  = arr; try{ localStorage.setItem('sn_hist2',  JSON.stringify(arr)); }catch(e){} if(typeof renderHist==='function') renderHist(); };
+window._setClients  = function(arr){ clients_  = arr; try{ localStorage.setItem('sn_cli2',   JSON.stringify(arr)); }catch(e){} if(typeof renderCadLists==='function') renderCadLists(); };
+window._setProducts = function(arr){ products_ = arr; try{ localStorage.setItem('sn_prod2',  JSON.stringify(arr)); }catch(e){} if(typeof renderCadLists==='function') renderCadLists(); };
 
 function comprimirBase64(base64, qualidade, cb){
   // Comprime imagem base64 para JPEG reduzido antes de ir ao Firestore

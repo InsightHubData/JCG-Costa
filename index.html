@@ -435,7 +435,7 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
     if(typeof initProdCodField==='function') initProdCodField();
   };
 
-  document.addEventListener('DOMContentLoaded',()=>{ window.fbLoadAll(); });
+  // fbLoadAll é chamado pelo doLogin() após autenticação bem-sucedida
 </script>
 </head>
 <body>
@@ -1189,9 +1189,25 @@ var products_ = [];
 
 // Setters expostos via window para o módulo Firebase poder atualizar
 // as variáveis locais deste script (escopos diferentes!)
-window._setHistory  = function(arr){ history_  = arr; try{ localStorage.setItem('sn_hist2',  JSON.stringify(arr)); }catch(e){} if(typeof renderHist==='function') renderHist(); };
-window._setClients  = function(arr){ clients_  = arr; try{ localStorage.setItem('sn_cli2',   JSON.stringify(arr)); }catch(e){} if(typeof renderCadLists==='function') renderCadLists(); };
-window._setProducts = function(arr){ products_ = arr; try{ localStorage.setItem('sn_prod2',  JSON.stringify(arr)); }catch(e){} if(typeof renderCadLists==='function') renderCadLists(); };
+window._setHistory  = function(arr){
+  history_ = arr;
+  try{ localStorage.setItem('sn_hist2', JSON.stringify(arr)); }catch(e){}
+  // Só renderizar se o app já estiver visível (após login)
+  var appVis = document.getElementById('appShell') && document.getElementById('appShell').style.display !== 'none';
+  if(appVis && typeof renderHist==='function'){ setWeekFilter(); renderHist(); }
+};
+window._setClients  = function(arr){
+  clients_ = arr;
+  try{ localStorage.setItem('sn_cli2', JSON.stringify(arr)); }catch(e){}
+  var appVis = document.getElementById('appShell') && document.getElementById('appShell').style.display !== 'none';
+  if(appVis && typeof renderCadLists==='function') renderCadLists();
+};
+window._setProducts = function(arr){
+  products_ = arr;
+  try{ localStorage.setItem('sn_prod2', JSON.stringify(arr)); }catch(e){}
+  var appVis = document.getElementById('appShell') && document.getElementById('appShell').style.display !== 'none';
+  if(appVis && typeof renderCadLists==='function') renderCadLists();
+};
 
 function comprimirBase64(base64, qualidade, cb){
   // Comprime imagem base64 para JPEG reduzido antes de ir ao Firestore
@@ -1294,6 +1310,10 @@ function doLogin(e){
     app.classList.add('active');
     document.getElementById('hdUser').textContent='👤 '+user.nome;
     initApp();
+    // Carregar dados do Firebase após login — garante que setters estão prontos
+    if(typeof window.fbLoadAll==='function'){
+      window.fbLoadAll();
+    }
   } else {
     var eb=document.getElementById('errBox');
     eb.style.display='flex';
@@ -1321,7 +1341,11 @@ function doLogout(){
 function initApp(){
   document.getElementById('fData').value=new Date().toISOString().split('T')[0];
   nextProposalNum();
-  setWeekFilter(); renderHist(); renderCadLists(); initProdCodField();
+  setWeekFilter();
+  // Renderizar com o que houver localmente — Firebase atualizará via _setHistory/_setClients
+  renderHist();
+  renderCadLists();
+  initProdCodField();
   if(document.getElementById('itemsBody').children.length===0) addItemRow();
 }
 

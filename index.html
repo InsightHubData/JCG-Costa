@@ -2053,14 +2053,17 @@ async function generatePDF(){
   doc.text('R$ '+fBRLn(grand), W-mR-2, y+5.5, {align:'right'});
   y+=8;
 
-  // Linha extenso do valor global
-  if(y+5>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
-  setF(accentBg); doc.rect(mL,y,cW,5.5,'F');
+  // Linha extenso do valor global — altura dinâmica para não cortar
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setC(navy);
+  var vgTexto='VALOR GLOBAL : = = = = = >   '+valorPorExtenso(grand).toUpperCase();
+  var vgLinhas=doc.splitTextToSize(vgTexto, cW-4);
+  var vgH=Math.max(5.5, vgLinhas.length*4+3);
+  if(y+vgH>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
+  setF(accentBg); doc.rect(mL,y,cW,vgH,'F');
   setD(navy2); doc.setLineWidth(0.3);
-  doc.line(mL,y,mL+cW,y); doc.line(mL,y+5.5,mL+cW,y+5.5);
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
-  doc.text('VALOR GLOBAL : = = = = = >   '+valorPorExtenso(grand).toUpperCase(), mL+2, y+3.8);
-  y+=8;
+  doc.line(mL,y,mL+cW,y); doc.line(mL,y+vgH,mL+cW,y+vgH);
+  doc.text(vgLinhas, mL+2, y+3.8);
+  y+=vgH+2.5;
 
   // ═══════════════════════════════════════════════════
   // OBSERVAÇÕES — caixa dinâmica que não corta o texto
@@ -3042,12 +3045,15 @@ function gerarPdfPedido(){
   doc.setFont('helvetica','bold'); doc.setFontSize(11); setC([200,235,255]);
   doc.text('R$ '+fBpN(vgFinal), W-mR-2, y+5.5, {align:'right'});
   y+=8;
-  setF([232,241,252]); doc.rect(mL,y,cW,5.5,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setC(navy);
+  var vgTexto2='VALOR GLOBAL : = = = = = >   '+valorPorExtenso(vgFinal).toUpperCase();
+  var vgLinhas2=doc.splitTextToSize(vgTexto2, cW-4);
+  var vgH2=Math.max(5.5, vgLinhas2.length*4+3);
+  setF([232,241,252]); doc.rect(mL,y,cW,vgH2,'F');
   setD(navy2); doc.setLineWidth(0.3);
-  doc.line(mL,y,mL+cW,y); doc.line(mL,y+5.5,mL+cW,y+5.5);
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy);
-  doc.text('VALOR GLOBAL : = = = = = >   '+valorPorExtenso(vgFinal).toUpperCase(),mL+2,y+3.8);
-  y+=8;
+  doc.line(mL,y,mL+cW,y); doc.line(mL,y+vgH2,mL+cW,y+vgH2);
+  doc.text(vgLinhas2, mL+2, y+3.8);
+  y+=vgH2+2.5;
 
   // Transportador
   if(y+14>H-25){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=10; }

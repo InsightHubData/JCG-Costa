@@ -417,14 +417,20 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
       // Chamar setter — atualiza history_ local E renderiza o front
       if(typeof window._setHistory==='function') window._setHistory(fh);
 
-      // Limpeza > 45 dias (em background)
+      // Limpeza > 45 dias — só apaga se tiver data preenchida E for realmente antiga
+      // NUNCA apaga registros sem data para não perder dados
       const limStr = new Date(Date.now()-45*864e5).toISOString().split('T')[0];
       for(const col of ['propostas','pedidos']){
         try{
           const snap=await getDocs(collection(db,col));
           for(const d of snap.docs){
-            const dt=d.data().data||d.data().createdAt||'';
-            if(dt&&dt<limStr) deleteDoc(doc(db,col,d.id));
+            const dados=d.data();
+            const dt=dados.data||dados.createdAt||'';
+            // Só apaga se: tem data E é anterior a 45 dias atrás
+            if(dt && dt.length===10 && dt<limStr){
+              console.log('🗑️ Limpando registro antigo:', col, dados.num||d.id, dt);
+              deleteDoc(doc(db,col,d.id));
+            }
           }
         }catch(e){}
       }
@@ -1190,9 +1196,12 @@ var products_ = [];
 // Setters expostos via window para o módulo Firebase poder atualizar
 // as variáveis locais deste script (escopos diferentes!)
 window._setHistory  = function(arr){
+  // Garantir que todos os itens têm semana — sem isso o filtro pode escondê-los
+  arr.forEach(function(h){
+    if(!h.semana && h.data) h.semana=weekKey(new Date(h.data+'T12:00:00'));
+  });
   history_ = arr;
   try{ localStorage.setItem('sn_hist2', JSON.stringify(arr)); }catch(e){}
-  // Só renderizar se o app já estiver visível (após login)
   var appVis = document.getElementById('appShell') && document.getElementById('appShell').style.display !== 'none';
   if(appVis && typeof renderHist==='function'){ setWeekFilter(); renderHist(); }
 };
@@ -1597,7 +1606,7 @@ function recalcTotals(){
   }
 }
 
-function fBRL(n){ return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+function fBRL(n){ return parseFloat((n||0).toFixed(2)).toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2,maximumFractionDigits:2}); }
 // Filtrar autocomplete de produto por grupo na proposta
 function filtrarProdGrupoProp(){
   // Apenas define o filtro — o autocomplete já vai usar ao digitar
@@ -1609,7 +1618,7 @@ function prodsFiltrados(){
   return g?products_.filter(function(p){ return (p.grupo||'')===g; }):products_;
 }
 function sincCidadeUF(){ /* campo livre — usuário digita direto */ }
-function fBRLn(n){ return n.toLocaleString('pt-BR',{minimumFractionDigits:2}); }
+function fBRLn(n){ return parseFloat((n||0).toFixed(2)).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
 function getItems(){
   var items=[];
@@ -2243,22 +2252,26 @@ function weekKey(date){
   var ys=new Date(Date.UTC(d.getUTCFullYear(),0,1));
   return d.getUTCFullYear()+'-W'+String(Math.ceil((((d-ys)/86400000)+1)/7)).padStart(2,'0');
 }
-function setWeekFilter(){ document.getElementById('fSemana').value=weekKey(new Date()); }
+function setWeekFilter(){ document.getElementById('fSemana').value=''; /* mostra todos por padrão */ }
 
 function renderHist(){
   var sem=document.getElementById('fSemana').value;
   var st=document.getElementById('fStatus').value;
   var bk=document.getElementById('fBusca').value.toLowerCase();
+  // Filtrar lista — semana só filtra se preenchida
   var f=history_.filter(function(h){
     return(!sem||h.semana===sem)&&(!st||h.status===st)&&
       (!bk||[h.num,h.orgao,h.pregao,h.lote].some(function(v){ return (v||'').toLowerCase().includes(bk); }));
   });
+  // Cards: pedidos da semana atual (sempre, independente do filtro)
+  var semAtual=weekKey(new Date());
+  var todosOsPedidos=history_.filter(function(h){ return h.tipo==='pedido'; });
+  var pedsSemAtual=todosOsPedidos.filter(function(h){ return h.semana===semAtual; });
   var fPed=f.filter(function(h){ return h.tipo==='pedido'; });
-  var fPedSem=history_.filter(function(h){ return h.tipo==='pedido'&&h.semana===document.getElementById('fSemana').value; });
-  document.getElementById('smTot').textContent=fPedSem.length;
-  document.getElementById('smVal').textContent='R$ '+fPed.reduce(function(a,h){ return a+(h.grandFinal||h.grand||0); },0).toLocaleString('pt-BR',{minimumFractionDigits:2});
-  document.getElementById('smEnv').textContent=fPed.filter(function(h){ return h.status==='Entregue'; }).length;
-  document.getElementById('smPend').textContent=fPed.filter(function(h){ return h.status!=='Entregue'; }).length;
+  document.getElementById('smTot').textContent=pedsSemAtual.length;
+  document.getElementById('smVal').textContent='R$ '+todosOsPedidos.reduce(function(a,h){ return a+(h.grandFinal||h.grand||0); },0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('smEnv').textContent=todosOsPedidos.filter(function(h){ return h.status==='Entregue'; }).length;
+  document.getElementById('smPend').textContent=todosOsPedidos.filter(function(h){ return h.status!=='Entregue'; }).length;
   var tbody=document.getElementById('histBody'), empty=document.getElementById('histEmpty');
   tbody.innerHTML='';
   if(!f.length){ empty.style.display='block'; return; }
@@ -2888,8 +2901,8 @@ function gerarPdfPedido(){
   function setC(a){ doc.setTextColor(a[0],a[1],a[2]); }
   function setF(a){ doc.setFillColor(a[0],a[1],a[2]); }
   function setD(a){ doc.setDrawColor(a[0],a[1],a[2]); }
-  function fBp(v){ return 'R$ '+parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2}); }
-  function fBpN(v){ return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2}); }
+  function fBp(v){ return 'R$ '+parseFloat((v||0).toFixed(2)).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function fBpN(v){ return parseFloat((v||0).toFixed(2)).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 
   // ── Cabeçalho — mesmo padrão da proposta ──
   var pedHdrH=34;

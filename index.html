@@ -625,14 +625,15 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
             <div class="tc-lbl">Total de Itens</div>
             <div class="tc-val" id="contadorItens" style="color:var(--navy)">0</div>
           </div>
-          <div class="total-chip">
-            <div class="tc-lbl">Desconto %</div>
+          <div class="total-chip" style="border-color:#b8dacc;background:linear-gradient(135deg,#f0faf4,#e8f5ee)">
+            <div class="tc-lbl" style="color:#1a5c2a">MARGEM GLOBAL %</div>
             <div style="display:flex;gap:6px;align-items:center">
-              <input type="number" id="fDesc" min="0" max="100" step="0.01" value="0"
-                style="width:64px;padding:4px 8px;border:1.5px solid var(--gray-bd);border-radius:5px;font-size:14px;background:var(--gray-bg)"
-                oninput="recalcTotals()" onchange="recalcTotals()">
-              <span style="font-size:13px;color:var(--text-sm)">%</span>
+              <input type="number" id="fDesc" min="0" max="999" step="0.1" value="0"
+                style="width:64px;padding:4px 8px;border:1.5px solid #b8dacc;border-radius:5px;font-size:14px;background:#f0faf4;color:#1a5c2a;font-weight:700"
+                oninput="aplicarMargemGlobal()" onchange="aplicarMargemGlobal()">
+              <span style="font-size:13px;color:#1a5c2a;font-weight:700">%</span>
             </div>
+            <div style="font-size:9px;color:#1a5c2a;margin-top:3px;opacity:.7">Zera margens por item</div>
           </div>
           <div class="total-chip grand">
             <div class="tc-lbl" id="lblTotalOriginal">VALOR ORIGINAL</div>
@@ -1387,7 +1388,7 @@ function _limparPropSilencioso(){
   document.getElementById('fVendedor').value='Sócio Administrador';
   document.getElementById('fTel').value='(92) 98502-6382';
   document.getElementById('fEmail').value='elicitacoes2023@gmail.com';
-  document.getElementById('fDesc').value='0';
+  document.getElementById('fDesc').value='';
   document.getElementById('fData').value=new Date().toISOString().split('T')[0];
   document.getElementById('itemsBody').innerHTML='';
   itemCnt=0; itemImages={};
@@ -1566,6 +1567,7 @@ function recalcRow(id){
 function recalcTotals(){
   var sub=0, subMarg=0;
   var margens=[];
+  var margGlobal=parseFloat(document.getElementById('fDesc').value)||0;
   document.querySelectorAll('#itemsBody tr').forEach(function(tr){
     var id=tr.id.replace('irow-','');
     var qty=parseFloat((document.getElementById('iqty-'+id)||{}).value||0)||0;
@@ -1573,37 +1575,55 @@ function recalcTotals(){
     var marg=parseFloat((document.getElementById('imarg-'+id)||{}).value||0)||0;
     var total=qty*unit;
     sub+=total;
-    subMarg+=marg>0?qty*unit*(1+marg/100):total;
-    if(marg>0&&margens.indexOf(marg)<0) margens.push(marg);
+    // Se tem margem global, ignora margem por item para o cálculo do total
+    if(margGlobal>0){
+      subMarg+=total; // base bruta — margem global aplica depois
+    } else {
+      subMarg+=marg>0?total*(1+marg/100):total;
+      if(marg>0&&margens.indexOf(marg)<0) margens.push(marg);
+    }
   });
-  var disc=parseFloat(document.getElementById('fDesc').value)||0;
+  // Aplicar margem global sobre o total bruto
+  var totalComMargem=margGlobal>0 ? sub*(1+margGlobal/100) : subMarg;
   // Atualiza valores
-  document.getElementById('grandTotal').textContent=fBRL(sub*(1-disc/100));
+  document.getElementById('grandTotal').textContent=fBRL(sub);
   var gtm=document.getElementById('grandTotalMargem');
-  if(gtm) gtm.textContent=fBRL(subMarg*(1-disc/100));
+  if(gtm) gtm.textContent=fBRL(totalComMargem);
   // Labels dinâmicas
   var lblOrig=document.getElementById('lblTotalOriginal');
   var lblMarg=document.getElementById('lblTotalMargem');
   if(lblOrig) lblOrig.textContent='VALOR TOTAL ORIGINAL';
   if(lblMarg){
-    if(margens.length===0){
+    if(margGlobal>0){
+      lblMarg.textContent='VALOR C/ MARGEM '+margGlobal+'%';
+    } else if(margens.length===0){
       lblMarg.textContent='VALOR C/ MARGEM';
     } else if(margens.length===1){
       lblMarg.textContent='VALOR C/ MARGEM '+margens[0]+'%';
     } else {
-      margens.sort(function(a,b){return a-b;});
       lblMarg.textContent='VALOR C/ MARGEM (misto)';
     }
   }
   // Compat hidden
   var s=document.getElementById('subtotal'); if(s) s.textContent=fBRL(sub);
-  var t=document.getElementById('totalComMargem'); if(t) t.textContent=fBRL(subMarg);
+  var t=document.getElementById('totalComMargem'); if(t) t.textContent=fBRL(totalComMargem);
   // Contador de itens
   var ci=document.getElementById('contadorItens');
-  if(ci){
-    var nItens=document.querySelectorAll('#itemsBody tr').length;
-    ci.textContent=nItens;
+  if(ci) ci.textContent=document.querySelectorAll('#itemsBody tr').length;
+}
+
+// Aplicar margem global: zera margens por item e recalcula
+function aplicarMargemGlobal(){
+  var margGlobal=parseFloat(document.getElementById('fDesc').value)||0;
+  if(margGlobal>0){
+    // Zerar todas as margens por item
+    document.querySelectorAll('#itemsBody tr').forEach(function(tr){
+      var id=tr.id.replace('irow-','');
+      var el=document.getElementById('imarg-'+id);
+      if(el){ el.value=''; el.style.borderColor='var(--gray-bd)'; }
+    });
   }
+  recalcTotals();
 }
 
 function fBRL(n){ return parseFloat((n||0).toFixed(2)).toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -1935,7 +1955,7 @@ async function generatePDF(){
   var grandTotal=0;
   for(var i=0;i<items.length;i++){
     var itm=items[i];
-    grandTotal+=(itm.marg>0?itm.totalFinal:itm.total);
+    grandTotal+=itm.total; // valor bruto — margem global aplica depois
 
     // Largura disponível — 2mm margem cada lado
     var descW=col.desc-4;
@@ -2043,7 +2063,10 @@ async function generatePDF(){
   // ═══════════════════════════════════════════════════
   if(y+14>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
   var disc=parseFloat(document.getElementById('fDesc').value)||0;
-  var grand=grandTotal*(1-disc/100);
+  // Se tem margem global, aplica sobre o total bruto; senão usa totalFinal por item
+  var grand=margGlobalPdf>0
+    ? grandTotal*(1+margGlobalPdf/100)
+    : items.reduce(function(a,i){ return a+(i.marg>0&&i.totalFinal?i.totalFinal:i.total); },0);
   // Uma única cor navy — label esquerda, valor direita
   setF(navy); doc.rect(mL,y,cW,8,'F');
   setF(navy2); doc.rect(mL,y,3,8,'F'); // faixa esquerda
@@ -2234,8 +2257,13 @@ function getFormData(){
     local: document.getElementById('fLocal').value,
     desconto: disc,
     items: items,
-    grand: sub*(1-disc/100),
-    grandFinal:items.reduce(function(a,i){ return a+(i.marg>0?i.totalFinal:i.total); },0)*(1-disc/100),
+    grand: sub,
+    grandFinal:(function(){
+      var mg=parseFloat((document.getElementById('fDesc')||{}).value||0)||0;
+      if(mg>0) return sub*(1+mg/100);
+      return items.reduce(function(a,i){ return a+(i.marg>0&&i.totalFinal?i.totalFinal:i.total); },0);
+    })(),
+    margGlobal: parseFloat((document.getElementById('fDesc')||{}).value||0)||0,
     status: 'Pendente',
     semana: weekKey(new Date())
   };

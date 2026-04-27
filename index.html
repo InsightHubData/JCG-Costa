@@ -1615,14 +1615,19 @@ function recalcTotals(){
 // Aplicar margem global: zera margens por item e recalcula
 function aplicarMargemGlobal(){
   var margGlobal=parseFloat(document.getElementById('fDesc').value)||0;
-  if(margGlobal>0){
-    // Zerar todas as margens por item
-    document.querySelectorAll('#itemsBody tr').forEach(function(tr){
-      var id=tr.id.replace('irow-','');
-      var el=document.getElementById('imarg-'+id);
-      if(el){ el.value=''; el.style.borderColor='var(--gray-bd)'; }
-    });
-  }
+  document.querySelectorAll('#itemsBody tr').forEach(function(tr){
+    var id=tr.id.replace('irow-','');
+    var el=document.getElementById('imarg-'+id);
+    if(!el) return;
+    if(margGlobal>0){
+      el.value=margGlobal;
+      el.style.borderColor='var(--green)';
+    } else {
+      el.value='';
+      el.style.borderColor='var(--gray-bd)';
+    }
+    recalcRow(id);
+  });
   recalcTotals();
 }
 
@@ -2064,6 +2069,7 @@ async function generatePDF(){
   if(y+14>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
   var disc=parseFloat(document.getElementById('fDesc').value)||0;
   // Se tem margem global, aplica sobre o total bruto; senão usa totalFinal por item
+  var margGlobalPdf=parseFloat(document.getElementById('fDesc').value)||0;
   var grand=margGlobalPdf>0
     ? grandTotal*(1+margGlobalPdf/100)
     : items.reduce(function(a,i){ return a+(i.marg>0&&i.totalFinal?i.totalFinal:i.total); },0);

@@ -2027,8 +2027,8 @@ async function generatePDF(){
     doc.text(itm.un||'UN',cx2+col.un/2,midY,{align:'center'}); cx2+=col.un;
     doc.text(String(itm.qty),cx2+col.qtd/2,midY,{align:'center'}); cx2+=col.qtd;
     // Valor unitário — com margem se definida
-    var pdfUnit=itm.marg>0?itm.unitFinal:itm.unit;
-    var pdfTotal=itm.marg>0?itm.totalFinal:itm.total;
+   var pdfUnit=Math.round((itm.marg>0?itm.unitFinal:itm.unit)*100)/100;
+   var pdfTotal=Math.round((itm.marg>0?itm.totalFinal:itm.total)*100)/100;
     doc.text(fBRLn(pdfUnit),cx2+col.unit/2,midY,{align:'center'}); cx2+=col.unit;
     // Valor total — bold navy (destaque)
     doc.setFont('helvetica','bold'); setC(navy);
@@ -3030,8 +3030,8 @@ function gerarPdfPedido(){
   d.items.forEach(function(it,i){
     if(y>H-30){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=10; }
     // Usar valor COM margem se disponível, senão bruto
-    var pedUnit=it.marg>0?it.unitFinal:it.unit;
-    var pedTotal=it.marg>0?it.totalFinal:it.total;
+    var pedUnit=Math.round((it.marg>0&&it.unitFinal?it.unitFinal:it.unit)*100)/100;
+    var pedTotal=Math.round((it.marg>0&&it.totalFinal?it.totalFinal:it.total)*100)/100;
     if(!pedUnit) pedUnit=it.unit; if(!pedTotal) pedTotal=it.total;
     var rowH=12; // altura maior para mais espaço entre itens
     var bg=i%2===0?white:[245,248,252];

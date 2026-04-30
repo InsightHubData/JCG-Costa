@@ -1445,7 +1445,12 @@ function addItemRow(data){
   var tr=document.createElement('tr');
   tr.id='irow-'+id;
   tr.innerHTML=
-    '<td style="text-align:center;font-weight:700;color:var(--navy)">'+id+'</td>'+
+    '<td style="text-align:center;padding:2px">'+
+  '<input type="number" id="inum-'+id+'" value="'+id+'" min="1" '+
+  'style="width:100%;text-align:center;font-weight:700;color:var(--navy);'+
+  'border:1.5px solid var(--gray-bd);border-radius:4px;padding:3px 2px;'+
+  'background:var(--gray-bg);font-size:12px">'+
+'</td>'+
     '<td>'+
       '<div class="autocomplete-wrap">'+
         '<input type="text" id="icod-'+id+'" value="'+(row.cod||'')+'" placeholder="Cód" style="width:100%;margin-bottom:3px;font-size:11px;font-weight:700;color:var(--blue);background:#f0f8ff;border-color:#a8d0f0;padding:4px 6px" oninput="acSearchProdCod('+id+')" autocomplete="off">'+
@@ -1653,7 +1658,8 @@ function getItems(){
     var qty=parseFloat(g('iqty-'))||0, unit=parseFloat(g('iunit-'))||0;
     var marg=parseFloat((document.getElementById('imarg-'+id)||{}).value||0)||0;
     var unitFinal=marg>0?unit*(1+marg/100):unit;
-    items.push({ num:i+1, cod:g('icod-'), nome:g('inome-'), desc:g('iobs-'), obs:g('iobs-'),
+    var numEdit=document.getElementById('inum-'+id); 
+    items.push({ num:numEdit?parseInt(numEdit.value)||i+1:i+1, cod:g('icod-'), nome:g('inome-'), desc:g('iobs-'), obs:g('iobs-'),
       marca:g('imarca-'), fabricante:g('ifabric-'), un:g('iun-')||'UN',
       qty:qty, unit:unit, unitFinal:unitFinal, marg:marg,
       total:qty*unit, totalFinal:qty*unitFinal, img:itemImages[id]||null });
@@ -1964,7 +1970,8 @@ async function generatePDF(){
 
     // Largura disponível — 2mm margem cada lado
     var descW=col.desc-4;
-    var nomeLines=itm.nome?doc.splitTextToSize(itm.nome.toUpperCase(),descW):[];
+    var nomePrefix=(itm.cod?itm.cod+' — ':'');
+    var nomeLines=doc.splitTextToSize((nomePrefix+(itm.nome||'')).toUpperCase(),descW);
     // Normalizar texto da descrição
     var obsRaw=(itm.desc||itm.obs||'').trim();
     obsRaw=obsRaw.split('\n').map(function(ln){ return ln.trim(); }).filter(function(ln){ return ln.length>0; }).join(' ');

@@ -1446,7 +1446,7 @@ function addItemRow(data){
   tr.id='irow-'+id;
   tr.innerHTML=
     '<td style="text-align:center;padding:2px">'+
-  '<input type="number" id="inum-'+id+'" value="'+id+'" min="1" '+
+ '<input type="number" id="inum-'+id+'" value="'+(row.num||id)+'" min="1" '+
   'style="width:100%;text-align:center;font-weight:700;color:var(--navy);'+
   'border:1.5px solid var(--gray-bd);border-radius:4px;padding:3px 2px;'+
   'background:var(--gray-bg);font-size:12px">'+

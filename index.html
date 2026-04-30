@@ -1658,8 +1658,9 @@ function getItems(){
     var qty=parseFloat(g('iqty-'))||0, unit=parseFloat(g('iunit-'))||0;
     var marg=parseFloat((document.getElementById('imarg-'+id)||{}).value||0)||0;
     var unitFinal=marg>0?unit*(1+marg/100):unit;
-    var numEdit=document.getElementById('inum-'+id); 
-    items.push({ num:numEdit?parseInt(numEdit.value)||i+1:i+1, cod:g('icod-'), nome:g('inome-'), desc:g('iobs-'), obs:g('iobs-'),
+    var numEdit=document.getElementById('inum-'+id);
+    var numVal=numEdit?parseInt(numEdit.value)||i+1:i+1;
+       items.push({ num:numEdit?parseInt(numEdit.value)||i+1:i+1, cod:g('icod-'), nome:g('inome-'), desc:g('iobs-'), obs:g('iobs-'),
       marca:g('imarca-'), fabricante:g('ifabric-'), un:g('iun-')||'UN',
       qty:qty, unit:unit, unitFinal:unitFinal, marg:marg,
       total:qty*unit, totalFinal:qty*unitFinal, img:itemImages[id]||null });

@@ -419,7 +419,7 @@ body{font-family:'Source Sans 3',sans-serif;background:#0d2b5e;min-height:100vh;
 
       // Limpeza > 45 dias — só apaga se tiver data preenchida E for realmente antiga
       // NUNCA apaga registros sem data para não perder dados
-      const limStr = new Date(Date.now()-45*864e5).toISOString().split('T')[0];
+      const limStr = new Date(Date.now()-180*864e5).toISOString().split('T')[0];
       for(const col of ['propostas','pedidos']){
         try{
           const snap=await getDocs(collection(db,col));
@@ -1178,7 +1178,7 @@ var EMPRESA = {
    USUÁRIOS
 ═══════════════════════════════════════ */
 var USERS = {
-  'jcg comercial': { senha:'JCG2030@', nome:'JCG Comercial' },
+  'jcg comercial': { senha:'JCG2026@', nome:'JCG Comercial' },
   'admin':         { senha:'admin123', nome:'Administrador' }
 };
 
@@ -1445,12 +1445,7 @@ function addItemRow(data){
   var tr=document.createElement('tr');
   tr.id='irow-'+id;
   tr.innerHTML=
-    '<td style="text-align:center;padding:2px">'+
- '<input type="number" id="inum-'+id+'" value="'+(row.num||id)+'" min="1" '+
-  'style="width:100%;text-align:center;font-weight:700;color:var(--navy);'+
-  'border:1.5px solid var(--gray-bd);border-radius:4px;padding:3px 2px;'+
-  'background:var(--gray-bg);font-size:12px">'+
-'</td>'+
+    '<td style="text-align:center;font-weight:700;color:var(--navy)">'+id+'</td>'+
     '<td>'+
       '<div class="autocomplete-wrap">'+
         '<input type="text" id="icod-'+id+'" value="'+(row.cod||'')+'" placeholder="Cód" style="width:100%;margin-bottom:3px;font-size:11px;font-weight:700;color:var(--blue);background:#f0f8ff;border-color:#a8d0f0;padding:4px 6px" oninput="acSearchProdCod('+id+')" autocomplete="off">'+
@@ -1620,19 +1615,14 @@ function recalcTotals(){
 // Aplicar margem global: zera margens por item e recalcula
 function aplicarMargemGlobal(){
   var margGlobal=parseFloat(document.getElementById('fDesc').value)||0;
-  document.querySelectorAll('#itemsBody tr').forEach(function(tr){
-    var id=tr.id.replace('irow-','');
-    var el=document.getElementById('imarg-'+id);
-    if(!el) return;
-    if(margGlobal>0){
-      el.value=margGlobal;
-      el.style.borderColor='var(--green)';
-    } else {
-      el.value='';
-      el.style.borderColor='var(--gray-bd)';
-    }
-    recalcRow(id);
-  });
+  if(margGlobal>0){
+    // Zerar todas as margens por item
+    document.querySelectorAll('#itemsBody tr').forEach(function(tr){
+      var id=tr.id.replace('irow-','');
+      var el=document.getElementById('imarg-'+id);
+      if(el){ el.value=''; el.style.borderColor='var(--gray-bd)'; }
+    });
+  }
   recalcTotals();
 }
 
@@ -1658,9 +1648,7 @@ function getItems(){
     var qty=parseFloat(g('iqty-'))||0, unit=parseFloat(g('iunit-'))||0;
     var marg=parseFloat((document.getElementById('imarg-'+id)||{}).value||0)||0;
     var unitFinal=marg>0?unit*(1+marg/100):unit;
-    var numEdit=document.getElementById('inum-'+id);
-    var numVal=numEdit?parseInt(numEdit.value)||i+1:i+1;
-       items.push({ num:numEdit?parseInt(numEdit.value)||i+1:i+1, cod:g('icod-'), nome:g('inome-'), desc:g('iobs-'), obs:g('iobs-'),
+    items.push({ num:i+1, cod:g('icod-'), nome:g('inome-'), desc:g('iobs-'), obs:g('iobs-'),
       marca:g('imarca-'), fabricante:g('ifabric-'), un:g('iun-')||'UN',
       qty:qty, unit:unit, unitFinal:unitFinal, marg:marg,
       total:qty*unit, totalFinal:qty*unitFinal, img:itemImages[id]||null });
@@ -1946,7 +1934,7 @@ async function generatePDF(){
   // ═══════════════════════════════════════════════════
   var items=getItems();
   // Colunas: item=10, desc=variável, marca=22, fabric=22, un=13, qtd=13, unit=26, total=26, img=16
-  var col={item:10, marca:22, fabric:22, un:13, qtd:13, unit:26, total:26};
+  var col={item:10, marca:30, fabric:22, un:13, qtd:13, unit:20, total:26};
   var imgCol=16;
   col.desc=cW-col.item-col.marca-col.fabric-col.un-col.qtd-col.unit-col.total-imgCol;
 
@@ -1956,7 +1944,7 @@ async function generatePDF(){
   doc.setFont('helvetica','bold'); doc.setFontSize(7); setC(white);
   var hx=mL;
   [['ITEM',col.item],['DESCRIÇÃO DETALHADA',col.desc],['MARCA',col.marca],['FABRICANTE',col.fabric],
-   ['UNID.',col.un],['QTDE',col.qtd],['VALOR UNITÁRIO',col.unit],['VALOR TOTAL',col.total],['FOTO',imgCol]
+   ['UNID.',col.un],['QTDE',col.qtd],['VLR UNIT.',col.unit],['VALOR TOTAL',col.total],['FOTO',imgCol]
   ].forEach(function(h){
     doc.text(h[0],hx+h[1]/2,y+4.6,{align:'center',maxWidth:h[1]-1});
     hx+=h[1];
@@ -1971,8 +1959,7 @@ async function generatePDF(){
 
     // Largura disponível — 2mm margem cada lado
     var descW=col.desc-4;
-    var nomePrefix=(itm.cod?itm.cod+' — ':'');
-    var nomeLines=doc.splitTextToSize((nomePrefix+(itm.nome||'')).toUpperCase(),descW);
+    var nomeLines=itm.nome?doc.splitTextToSize(itm.nome.toUpperCase(),descW):[];
     // Normalizar texto da descrição
     var obsRaw=(itm.desc||itm.obs||'').trim();
     obsRaw=obsRaw.split('\n').map(function(ln){ return ln.trim(); }).filter(function(ln){ return ln.length>0; }).join(' ');
@@ -2030,13 +2017,16 @@ async function generatePDF(){
     var cx2=mL+col.item+col.desc;
     // Todas colunas centrais: mesma fonte/cor padrão
     doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
-    doc.text(doc.splitTextToSize(itm.marca||'',col.marca-2)[0]||'',cx2+col.marca/2,midY,{align:'center'}); cx2+=col.marca;
+    var marcaLines=doc.splitTextToSize(itm.marca||'',col.marca-2);
+    var marcaY=marcaLines.length>1?midY-1.5:midY;
+    doc.text(marcaLines.slice(0,2),cx2+col.marca/2,marcaY,{align:'center',lineHeightFactor:1.3});
+    cx2+=col.marca;
     doc.text(doc.splitTextToSize(itm.fabricante||'',col.fabric-2)[0]||'',cx2+col.fabric/2,midY,{align:'center'}); cx2+=col.fabric;
     doc.text(itm.un||'UN',cx2+col.un/2,midY,{align:'center'}); cx2+=col.un;
     doc.text(String(itm.qty),cx2+col.qtd/2,midY,{align:'center'}); cx2+=col.qtd;
     // Valor unitário — com margem se definida
-   var pdfUnit=Math.round((itm.marg>0?itm.unitFinal:itm.unit)*100)/100;
-   var pdfTotal=Math.round((itm.marg>0?itm.totalFinal:itm.total)*100)/100;
+    var pdfUnit=itm.marg>0?itm.unitFinal:itm.unit;
+    var pdfTotal=itm.marg>0?itm.totalFinal:itm.total;
     doc.text(fBRLn(pdfUnit),cx2+col.unit/2,midY,{align:'center'}); cx2+=col.unit;
     // Valor total — bold navy (destaque)
     doc.setFont('helvetica','bold'); setC(navy);
@@ -2077,7 +2067,6 @@ async function generatePDF(){
   if(y+14>H-28){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=drawPageHeader(mT,_logoData); }
   var disc=parseFloat(document.getElementById('fDesc').value)||0;
   // Se tem margem global, aplica sobre o total bruto; senão usa totalFinal por item
-  var margGlobalPdf=parseFloat(document.getElementById('fDesc').value)||0;
   var grand=margGlobalPdf>0
     ? grandTotal*(1+margGlobalPdf/100)
     : items.reduce(function(a,i){ return a+(i.marg>0&&i.totalFinal?i.totalFinal:i.total); },0);
@@ -3025,7 +3014,7 @@ function gerarPdfPedido(){
   y+=26;
 
   // Tabela itens
-  var col2={num:10,nome:0,marca:22,fabric:22,un:14,qtd:14,unit:24,total:24};
+  var col2={num:10,nome:0,marca:30,fabric:22,un:14,qtd:14,unit:18,total:24};
   col2.nome=cW-col2.num-col2.marca-col2.fabric-col2.un-col2.qtd-col2.unit-col2.total;
   setF(navy); doc.rect(mL,y,cW,6.5,'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setC(white);
@@ -3038,8 +3027,8 @@ function gerarPdfPedido(){
   d.items.forEach(function(it,i){
     if(y>H-30){ addPdfFooterJCG(doc,W,H,mL,mR); doc.addPage(); y=10; }
     // Usar valor COM margem se disponível, senão bruto
-    var pedUnit=Math.round((it.marg>0&&it.unitFinal?it.unitFinal:it.unit)*100)/100;
-    var pedTotal=Math.round((it.marg>0&&it.totalFinal?it.totalFinal:it.total)*100)/100;
+    var pedUnit=it.marg>0?it.unitFinal:it.unit;
+    var pedTotal=it.marg>0?it.totalFinal:it.total;
     if(!pedUnit) pedUnit=it.unit; if(!pedTotal) pedTotal=it.total;
     var rowH=12; // altura maior para mais espaço entre itens
     var bg=i%2===0?white:[245,248,252];
@@ -3052,7 +3041,10 @@ function gerarPdfPedido(){
     doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(text_);
     doc.text(doc.splitTextToSize(it.nome||'',col2.nome-2)[0]||'',cx3+1,midY); cx3+=col2.nome;
     doc.setFont('helvetica','bold'); doc.setFontSize(8); setC(navy2);
-    doc.text(doc.splitTextToSize(it.marca||'',col2.marca-2)[0]||'',cx3+col2.marca/2,midY,{align:'center'}); cx3+=col2.marca;
+    var marcaLines2=doc.splitTextToSize(it.marca||'',col2.marca-2);
+    var marcaY2=marcaLines2.length>1?midY-1.5:midY;
+    doc.text(marcaLines2.slice(0,2),cx3+col2.marca/2,marcaY2,{align:'center',lineHeightFactor:1.3});
+    cx3+=col2.marca;
     doc.setFont('helvetica','normal'); doc.setFontSize(8); setC(text_);
     doc.text(doc.splitTextToSize(it.fabricante||'',col2.fabric-2)[0]||'',cx3+col2.fabric/2,midY,{align:'center'}); cx3+=col2.fabric;
     doc.setFont('helvetica','bold'); setC(text_);

@@ -1694,7 +1694,9 @@ function getLogoData(){
 }
 
 async function generatePDF(){
+  try{
   var jsPDFLib=window.jspdf;
+  if(!jsPDFLib){ console.error('jsPDF não carregado'); toast('Erro: biblioteca PDF não carregada.','err'); return; }
   var doc=new jsPDFLib.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   var W=210,H=297,mL=8,mR=8,mT=8;
   var cW=W-mL-mR;
@@ -1952,6 +1954,7 @@ async function generatePDF(){
   y+=7;
   setD(grayBd); doc.setLineWidth(0.2);
 
+  var margGlobalPdf=parseFloat((document.getElementById('fDesc')||{}).value||0)||0;
   var grandTotal=0;
   for(var i=0;i<items.length;i++){
     var itm=items[i];
@@ -2176,6 +2179,7 @@ async function generatePDF(){
     editingId=_d.id; saveLS(_d); renderHist();
   }
   toast('PDF gerado com sucesso!','ok');
+  } catch(pdfErr){ console.error('Erro ao gerar PDF:', pdfErr); toast('Erro ao gerar PDF: '+pdfErr.message,'err'); }
 }
 
 function addPdfFooterJCG(doc,W,H,mL,mR){
@@ -2384,7 +2388,7 @@ function editProp(arg){
   document.getElementById('fPgto').value=h.pgto||'';
   document.getElementById('fEntrega').value=h.entrega||'';
   document.getElementById('fLocal').value=h.local||'';
-  document.getElementById('fDesc').value=h.desconto||0;
+  document.getElementById('fDesc').value=h.margGlobal||h.desconto||0;
   if(h.frete) document.getElementById('fFrete').value=h.frete;
   if(h.modalidade) document.getElementById('fModalidade').value=h.modalidade;
   document.getElementById('itemsBody').innerHTML='';
@@ -2414,7 +2418,10 @@ function rePDF(arg){
     setTimeout(function(){ gerarPdfPedido(); },350);
   } else {
     editProp(id);
-    setTimeout(function(){ generatePDF(); },300);
+    // Aguardar o form terminar de renderizar todos os itens antes de gerar PDF
+    var nItens=(h.items||[]).length;
+    var delay=Math.max(400, nItens*15); // mín 400ms, +15ms por item
+    setTimeout(function(){ generatePDF(); }, delay);
   }
 }
 function clearHist(){ if(!confirm('Limpar todo o histórico?')) return; history_=[]; saveLS(); renderHist(); toast('Histórico limpo.',''); }
@@ -2851,7 +2858,8 @@ function recalcPed(){
     }
   });
   var disc=parseFloat(document.getElementById('pedDesconto').value)||0;
-  var grand=sub*(1-disc/100);
+  var disc=0; // desconto não usado — mantido por compatibilidade
+  var grand=sub;
   var grandM=subMarg*(1-disc/100);
   var g=function(id){ return document.getElementById(id); };
   if(g('pedSubtotal')) g('pedSubtotal').textContent='R$ '+sub.toLocaleString('pt-BR',{minimumFractionDigits:2});
@@ -3209,6 +3217,7 @@ function gerarPdfPedido(){
     fbSalvarHistItem(history_[existePed]);
     renderHist();
   }
+
   toast('PDF do Pedido gerado!','ok');
 }
 </script>
